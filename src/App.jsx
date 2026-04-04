@@ -10,32 +10,34 @@ import useAuthStore from './store/useAuthStore'
 import useGeolocation from './hooks/useGeolocation'
 import useIsMobile from './hooks/useIsMobile'
 
+// Safari için webkit prefix'li backdrop
+const blurBg = (bg) => ({
+  background: bg,
+  backdropFilter: 'blur(8px)',
+  WebkitBackdropFilter: 'blur(8px)',
+})
+
 const s = {
-  app: { display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' },
-  content: { display: 'flex', flex: 1, overflow: 'hidden', position: 'relative' },
-  mapWrapper: { flex: 1, position: 'relative', overflow: 'hidden' },
+  // height: 100% → index.css'teki -webkit-fill-available ile Safari'de düzgün çalışır
+  app: { display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' },
+  content: { display: 'flex', flex: 1, overflow: 'hidden', position: 'relative', minHeight: 0 },
+  mapWrapper: { flex: 1, position: 'relative', overflow: 'hidden', minWidth: 0 },
   fabBtn: (primary) => ({
     display: 'flex', alignItems: 'center', gap: '8px', padding: '11px 20px', borderRadius: '30px',
     border: primary ? 'none' : '1px solid #2d3148', cursor: 'pointer', whiteSpace: 'nowrap',
-    background: primary ? '#6366f1' : '#1e2130ee', backdropFilter: 'blur(8px)',
+    ...blurBg(primary ? '#6366f1' : '#1e2130ee'),
     color: primary ? 'white' : '#94a3b8', fontSize: '13px', fontWeight: 600,
     boxShadow: '0 4px 20px rgba(0,0,0,0.35)', transition: 'all 0.15s',
-  }),
-  toast: (visible) => ({
-    position: 'absolute', top: '14px', left: '50%',
-    transform: `translateX(-50%) translateY(${visible ? 0 : '-8px'}px)`,
-    zIndex: 900, background: '#10b981', borderRadius: '20px', padding: '8px 18px',
-    fontSize: '13px', fontWeight: 600, color: 'white', pointerEvents: 'none',
-    whiteSpace: 'nowrap', boxShadow: '0 4px 16px rgba(16,185,129,0.4)',
-    opacity: visible ? 1 : 0, transition: 'all 0.3s',
+    touchAction: 'manipulation',
   }),
   setupBanner: {
-    position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(4px)',
+    position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.85)',
+    backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)',
     display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000,
   },
   setupCard: {
     background: '#1e2130', border: '1px solid #2d3148', borderRadius: '16px',
-    padding: '32px', maxWidth: '420px', textAlign: 'center',
+    padding: '32px', maxWidth: '420px', width: '90%', textAlign: 'center',
   },
 }
 
@@ -44,20 +46,21 @@ export default function App() {
   const { user, profile, init: initAuth, loading: authLoading, isAdmin } = useAuthStore()
   const {
     location, ipLocation, gpsLocation, manualLocation,
-    setManualLocation, gpsStatus, gpsAccuracy,
+    setManualLocation, gpsStatus, gpsAccuracy, requestLocation,
   } = useGeolocation()
 
   const isMobile = useIsMobile()
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 768)
 
-  const [clickedPos, setClickedPos]       = useState(null)
-  const [modalOpen, setModalOpen]         = useState(false)
-  const [authModalOpen, setAuthModalOpen] = useState(false)
-  const [showAdmin, setShowAdmin]         = useState(false)
-  const [pendingPos, setPendingPos]       = useState(null)
-  const [flyTarget, setFlyTarget]         = useState(null)
-  const [toast, setToast]                 = useState({ msg: '', visible: false })
+  const [clickedPos, setClickedPos]         = useState(null)
+  const [modalOpen, setModalOpen]           = useState(false)
+  const [authModalOpen, setAuthModalOpen]   = useState(false)
+  const [showAdmin, setShowAdmin]           = useState(false)
+  const [pendingPos, setPendingPos]         = useState(null)
+  const [flyTarget, setFlyTarget]           = useState(null)
+  const [toast, setToast]                   = useState({ msg: '', visible: false })
   const [manualPickMode, setManualPickMode] = useState(false)
+  const [showLocHelp, setShowLocHelp]       = useState(false)
 
   const supabaseConfigured = !!(
     import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -80,7 +83,6 @@ export default function App() {
     }
   }, [gpsLocation, hasFlownToGps])
 
-  // Mobil'de sidebar açıkken kapat
   useEffect(() => {
     if (!isMobile) setSidebarOpen(true)
   }, [isMobile])
@@ -150,17 +152,18 @@ export default function App() {
 
   const locationBadge = () => {
     if (gpsLocation) return { dot: '#10b981', text: `GPS ±${gpsAccuracy}m` }
-    if (manualLocation) return { dot: '#6366f1', text: '📌 Manuel konum' }
-    if (gpsStatus === 'unreliable') return { dot: '#f59e0b', text: `GPS güvenilmez (±${gpsAccuracy}m)` }
+    if (manualLocation) return { dot: '#6366f1', text: '📌 Manuel' }
+    if (gpsStatus === 'unreliable') return { dot: '#f59e0b', text: `GPS zayıf ±${gpsAccuracy}m` }
     if (gpsStatus === 'denied') return { dot: '#ef4444', text: 'GPS izni yok' }
-    if (ipLocation) return { dot: '#f59e0b', text: `${ipLocation.city || 'Bilinmiyor'} (IP)` }
+    if (gpsStatus === 'error') return { dot: '#ef4444', text: 'GPS hatası' }
+    if (ipLocation) return { dot: '#f59e0b', text: `${ipLocation.city || 'IP konum'}` }
     return { dot: '#64748b', text: 'Konum bekleniyor...' }
   }
   const badge = locationBadge()
 
-  const showManualHint = !gpsLocation && !manualLocation && (gpsStatus === 'unreliable' || gpsStatus === 'denied')
+  const showManualHint = !gpsLocation && !manualLocation &&
+    (gpsStatus === 'unreliable' || gpsStatus === 'denied' || gpsStatus === 'error')
 
-  // Dinamik pozisyonlar
   const fabBottom = isMobile ? '72px' : '24px'
   const badgeBottom = isMobile ? '84px' : '80px'
 
@@ -181,6 +184,7 @@ export default function App() {
           <pre style={{
             background: '#252836', borderRadius: '8px', padding: '16px',
             fontSize: '12px', color: '#818cf8', textAlign: 'left', marginBottom: '16px',
+            overflowX: 'auto',
           }}>
 {`VITE_SUPABASE_URL=https://xxx.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJ...`}
@@ -230,47 +234,78 @@ VITE_SUPABASE_ANON_KEY=eyJ...`}
             {/* Üst bilgi */}
             <div style={{
               position: 'absolute', top: '14px', left: '50%', transform: 'translateX(-50%)',
-              zIndex: 800, background: '#1e2130cc', backdropFilter: 'blur(8px)',
+              zIndex: 800, ...blurBg('#1e2130cc'),
               border: '1px solid #2d3148', borderRadius: '20px', padding: '7px 14px',
               fontSize: isMobile ? '11px' : '12px', color: '#94a3b8',
-              pointerEvents: 'none', whiteSpace: 'nowrap', maxWidth: '90%', textAlign: 'center',
+              pointerEvents: 'none', whiteSpace: 'nowrap', maxWidth: '88%', textAlign: 'center',
             }}>
               {hintText}
             </div>
 
             {/* Toast */}
-            <div style={s.toast(toast.visible)}>{toast.msg}</div>
+            <div style={{
+              position: 'absolute', top: '14px', left: '50%',
+              transform: `translateX(-50%) translateY(${toast.visible ? 0 : -8}px)`,
+              zIndex: 900, background: '#10b981', borderRadius: '20px', padding: '8px 18px',
+              fontSize: '13px', fontWeight: 600, color: 'white', pointerEvents: 'none',
+              whiteSpace: 'nowrap', boxShadow: '0 4px 16px rgba(16,185,129,0.4)',
+              opacity: toast.visible ? 1 : 0, transition: 'all 0.3s',
+            }}>
+              {toast.msg}
+            </div>
 
-            {/* GPS unreliable uyarısı */}
+            {/* Konum izni yok / GPS hatası → buton göster */}
             {showManualHint && (
               <div style={{
                 position: 'absolute', top: '52px', left: '50%', transform: 'translateX(-50%)',
-                zIndex: 800, background: '#78350fee', backdropFilter: 'blur(8px)',
-                border: '1px solid #f59e0b44', borderRadius: '12px', padding: '8px 16px',
-                fontSize: '12px', color: '#fcd34d', display: 'flex', alignItems: 'center', gap: '8px',
-                maxWidth: '90%', textAlign: 'center',
+                zIndex: 800, ...blurBg('#78350fee'),
+                border: '1px solid #f59e0b44', borderRadius: '12px', padding: '10px 14px',
+                fontSize: '12px', color: '#fcd34d',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px',
+                maxWidth: '92%', textAlign: 'center',
               }}>
-                ⚠️ GPS yok veya sinyal zayıf —
-                <button
-                  onClick={() => setManualPickMode(true)}
-                  style={{
-                    background: 'none', border: 'none', color: '#fbbf24',
-                    textDecoration: 'underline', cursor: 'pointer', fontSize: '12px',
-                    fontFamily: 'inherit', padding: '0 4px',
-                  }}
-                >
-                  konumunuzu manuel ayarlayın
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                  ⚠️ GPS izni yok veya sinyal zayıf
+                  <button
+                    onClick={() => { requestLocation(); showToast('Konum isteniyor...') }}
+                    style={{
+                      background: '#f59e0b22', border: '1px solid #f59e0b66', color: '#fbbf24',
+                      borderRadius: '8px', padding: '3px 10px', fontSize: '12px',
+                      cursor: 'pointer', fontFamily: 'inherit', touchAction: 'manipulation',
+                    }}
+                  >
+                    📍 İzin Ver
+                  </button>
+                  <button
+                    onClick={() => setManualPickMode(true)}
+                    style={{
+                      background: 'none', border: 'none', color: '#fbbf24',
+                      textDecoration: 'underline', cursor: 'pointer', fontSize: '12px',
+                      fontFamily: 'inherit', padding: '0', touchAction: 'manipulation',
+                    }}
+                  >
+                    Manuel seç
+                  </button>
+                </div>
+                {gpsStatus === 'denied' && isMobile && (
+                  <div style={{ fontSize: '11px', color: '#fcd34d99', lineHeight: 1.5 }}>
+                    iOS: Ayarlar → Safari → Konum → İzin Ver
+                  </div>
+                )}
               </div>
             )}
 
             {/* Konum rozeti */}
-            <div style={{
-              position: 'absolute', bottom: badgeBottom, left: '16px', zIndex: 800,
-              display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px',
-              background: '#1e2130ee', backdropFilter: 'blur(8px)', border: '1px solid #2d3148',
-              borderRadius: '20px', fontSize: '11px', color: '#94a3b8',
-            }}>
+            <div
+              onClick={gpsStatus === 'denied' || gpsStatus === 'error' ? () => requestLocation() : undefined}
+              style={{
+                position: 'absolute', bottom: badgeBottom, left: '16px', zIndex: 800,
+                display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px',
+                ...blurBg('#1e2130ee'), border: '1px solid #2d3148',
+                borderRadius: '20px', fontSize: '11px', color: '#94a3b8',
+                cursor: (gpsStatus === 'denied' || gpsStatus === 'error') ? 'pointer' : 'default',
+              }}
+            >
               <div style={{ width: '7px', height: '7px', borderRadius: '50%', flexShrink: 0, background: badge.dot }} />
               {badge.text}
             </div>

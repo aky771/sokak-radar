@@ -44,13 +44,16 @@ const ds = {
 const ms = {
   sheet: (open) => ({
     position: 'fixed', bottom: 0, left: 0, right: 0,
-    height: open ? '65vh' : '52px',
+    // dvh: Safari adres çubuğunu hariç tutar — overflow sorununu önler
+    height: open ? '65dvh' : '52px',
     background: '#1a1d27',
     borderTop: '1px solid #2d3148',
     borderRadius: '16px 16px 0 0',
     display: 'flex', flexDirection: 'column',
     transition: 'height 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
     zIndex: 700, overflow: 'hidden',
+    // Safari'de position:fixed düzgün çalışması için
+    WebkitOverflowScrolling: 'touch',
   }),
   handle: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
