@@ -133,7 +133,7 @@ function AlertPopupContent({ alert, info, onVote }) {
 
 export default function MapView({
   onMapClick, onRightClick, flyTarget,
-  gpsLocation, manualLocation, setManualLocation, initialCenter,
+  gpsLocation, manualLocation, setManualLocation, initialCenter, isMobile,
 }) {
   const alerts    = useAlertStore((st) => st.alerts)
   const voteAlert = useAlertStore((st) => st.voteAlert)
@@ -155,7 +155,7 @@ export default function MapView({
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>'
         maxZoom={20}
       />
-      <ZoomControl position="bottomright" />
+      <ZoomControl position={isMobile ? 'topright' : 'bottomright'} />
       <MapClickHandler onMapClick={onMapClick} onRightClick={onRightClick} />
       {flyTarget && <MapFlyTo target={flyTarget} />}
 

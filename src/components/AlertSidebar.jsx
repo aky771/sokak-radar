@@ -17,13 +17,14 @@ function ExpiryBar({ expiresAt }) {
   const pct = Math.max(0, Math.min(100, (remaining / total) * 100))
   const color = pct > 50 ? '#10b981' : pct > 20 ? '#f59e0b' : '#ef4444'
   return (
-    <div style={{ height: '3px', background: '#2d3148', marginBottom: '0' }}>
+    <div style={{ height: '3px', background: '#2d3148' }}>
       <div style={{ width: `${pct}%`, height: '100%', background: color, transition: 'width 1s' }} />
     </div>
   )
 }
 
-const s = {
+// ---------- Desktop styles ----------
+const ds = {
   sidebar: (open) => ({
     width: open ? '360px' : '0', minWidth: open ? '360px' : '0',
     overflow: 'hidden', background: '#1a1d27', borderLeft: '1px solid #2d3148',
@@ -37,6 +38,39 @@ const s = {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     zIndex: 500, color: '#64748b', fontSize: '16px',
   },
+}
+
+// ---------- Mobile styles ----------
+const ms = {
+  sheet: (open) => ({
+    position: 'fixed', bottom: 0, left: 0, right: 0,
+    height: open ? '65vh' : '52px',
+    background: '#1a1d27',
+    borderTop: '1px solid #2d3148',
+    borderRadius: '16px 16px 0 0',
+    display: 'flex', flexDirection: 'column',
+    transition: 'height 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+    zIndex: 700, overflow: 'hidden',
+  }),
+  handle: {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    padding: '0 16px', height: '52px', flexShrink: 0, cursor: 'pointer',
+    position: 'relative', userSelect: 'none',
+  },
+  handleBar: {
+    position: 'absolute', top: '8px', left: '50%', transform: 'translateX(-50%)',
+    width: '36px', height: '4px', borderRadius: '2px', background: '#3d4460',
+  },
+  handleTitle: { fontSize: '13px', fontWeight: 700, color: '#e2e8f0' },
+  handleArrow: (open) => ({
+    fontSize: '18px', color: '#64748b',
+    transition: 'transform 0.3s',
+    transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
+  }),
+}
+
+// ---------- Shared styles ----------
+const sh = {
   head: { padding: '14px 16px', borderBottom: '1px solid #2d3148', flexShrink: 0 },
   headTitle: { fontSize: '14px', fontWeight: 700, color: '#e2e8f0', marginBottom: '10px' },
   filterRow: { display: 'flex', gap: '5px', flexWrap: 'wrap' },
@@ -78,38 +112,33 @@ const s = {
   },
 }
 
-export default function AlertSidebar({ onAlertClick }) {
+export default function AlertSidebar({ onAlertClick, open, setOpen, isMobile }) {
   const alerts = useAlertStore((st) => st.alerts)
   const removeAlert = useAlertStore((st) => st.removeAlert)
   const voteAlert = useAlertStore((st) => st.voteAlert)
   const { user } = useAuthStore()
-  const [open, setOpen] = useState(true)
   const [filter, setFilter] = useState('all')
   const [hovered, setHovered] = useState(null)
 
   const filtered = filter === 'all' ? alerts : alerts.filter((a) => a.type === filter)
 
-  return (
-    <div style={s.sidebar(open)}>
-      <button style={s.toggle} onClick={() => setOpen(!open)}>
-        {open ? '›' : '‹'}
-      </button>
-
-      <div style={s.head}>
-        <div style={s.headTitle}>Uyarılar ({filtered.length})</div>
-        <div style={s.filterRow}>
-          <button style={s.filterBtn(filter === 'all')} onClick={() => setFilter('all')}>Tümü</button>
+  const alertList = (
+    <>
+      <div style={sh.head}>
+        <div style={sh.headTitle}>Uyarılar ({filtered.length})</div>
+        <div style={sh.filterRow}>
+          <button style={sh.filterBtn(filter === 'all')} onClick={() => setFilter('all')}>Tümü</button>
           {Object.entries(ALERT_TYPES).map(([key, info]) => (
-            <button key={key} style={s.filterBtn(filter === key)} onClick={() => setFilter(key)}>
+            <button key={key} style={sh.filterBtn(filter === key)} onClick={() => setFilter(key)}>
               {info.emoji}
             </button>
           ))}
         </div>
       </div>
 
-      <div style={s.list}>
+      <div style={sh.list}>
         {filtered.length === 0 && (
-          <div style={s.empty}>
+          <div style={sh.empty}>
             <div style={{ fontSize: '28px', marginBottom: '8px' }}>🗺️</div>
             Henüz uyarı yok.
             <br /><span style={{ fontSize: '11px' }}>Haritaya tıklayarak ekleyin.</span>
@@ -121,42 +150,35 @@ export default function AlertSidebar({ onAlertClick }) {
           return (
             <div
               key={alert.id}
-              style={s.card(hovered === alert.id ? info.color : '#2d3148')}
+              style={sh.card(hovered === alert.id ? info.color : '#2d3148')}
               onMouseEnter={() => setHovered(alert.id)}
               onMouseLeave={() => setHovered(null)}
               onClick={() => onAlertClick(alert)}
             >
-              <div style={s.cardTop}>
-                <span style={s.typeBadge(info.color, info.bg)}>
+              <div style={sh.cardTop}>
+                <span style={sh.typeBadge(info.color, info.bg)}>
                   {info.emoji} {info.label}
                 </span>
-                <span style={s.cardTime}>{timeAgo(alert.created_at)}</span>
+                <span style={sh.cardTime}>{timeAgo(alert.created_at)}</span>
               </div>
-
-              {alert.photo_url && (
-                <img src={alert.photo_url} alt="" style={s.cardPhoto} />
-              )}
-              {alert.description && (
-                <div style={s.cardDesc}>{alert.description}</div>
-              )}
-
+              {alert.photo_url && <img src={alert.photo_url} alt="" style={sh.cardPhoto} />}
+              {alert.description && <div style={sh.cardDesc}>{alert.description}</div>}
               <ExpiryBar expiresAt={alert.expires_at} />
-
-              <div style={s.cardFooter}>
-                <span style={s.coordText}>
+              <div style={sh.cardFooter}>
+                <span style={sh.coordText}>
                   {alert.lat?.toFixed(4)}, {alert.lng?.toFixed(4)}
                 </span>
                 <button
-                  style={s.voteBtn}
+                  style={sh.voteBtn}
                   onClick={(e) => { e.stopPropagation(); voteAlert(alert.id) }}
                   onMouseEnter={(e) => { e.currentTarget.style.color = '#10b981' }}
                   onMouseLeave={(e) => { e.currentTarget.style.color = '#64748b' }}
                 >
                   👍 {alert.votes}
                 </button>
-                {(isOwn) && (
+                {isOwn && (
                   <button
-                    style={s.deleteBtn}
+                    style={sh.deleteBtn}
                     onClick={(e) => { e.stopPropagation(); removeAlert(alert.id) }}
                     onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
                     onMouseLeave={(e) => (e.currentTarget.style.color = '#475569')}
@@ -169,6 +191,33 @@ export default function AlertSidebar({ onAlertClick }) {
           )
         })}
       </div>
+    </>
+  )
+
+  // ---------- MOBİL: Alt çekmece ----------
+  if (isMobile) {
+    return (
+      <div style={ms.sheet(open)}>
+        {/* Sürükleme tutacağı */}
+        <div style={ms.handle} onClick={() => setOpen(!open)}>
+          <div style={ms.handleBar} />
+          <span style={ms.handleTitle}>
+            {open ? 'Uyarılar' : `Uyarılar (${filtered.length})`}
+          </span>
+          <span style={ms.handleArrow(open)}>⌃</span>
+        </div>
+        {alertList}
+      </div>
+    )
+  }
+
+  // ---------- MASAÜSTÜ: Sağ panel ----------
+  return (
+    <div style={ds.sidebar(open)}>
+      <button style={ds.toggle} onClick={() => setOpen(!open)}>
+        {open ? '›' : '‹'}
+      </button>
+      {alertList}
     </div>
   )
 }

@@ -8,15 +8,12 @@ import AdminPanel from './components/AdminPanel'
 import useAlertStore from './store/useAlertStore'
 import useAuthStore from './store/useAuthStore'
 import useGeolocation from './hooks/useGeolocation'
+import useIsMobile from './hooks/useIsMobile'
 
 const s = {
   app: { display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' },
   content: { display: 'flex', flex: 1, overflow: 'hidden', position: 'relative' },
   mapWrapper: { flex: 1, position: 'relative', overflow: 'hidden' },
-  fab: {
-    position: 'absolute', bottom: '24px', left: '50%', transform: 'translateX(-50%)',
-    zIndex: 800, display: 'flex', gap: '10px',
-  },
   fabBtn: (primary) => ({
     display: 'flex', alignItems: 'center', gap: '8px', padding: '11px 20px', borderRadius: '30px',
     border: primary ? 'none' : '1px solid #2d3148', cursor: 'pointer', whiteSpace: 'nowrap',
@@ -24,12 +21,6 @@ const s = {
     color: primary ? 'white' : '#94a3b8', fontSize: '13px', fontWeight: 600,
     boxShadow: '0 4px 20px rgba(0,0,0,0.35)', transition: 'all 0.15s',
   }),
-  hint: {
-    position: 'absolute', top: '14px', left: '50%', transform: 'translateX(-50%)',
-    zIndex: 800, background: '#1e2130cc', backdropFilter: 'blur(8px)',
-    border: '1px solid #2d3148', borderRadius: '20px', padding: '7px 14px',
-    fontSize: '12px', color: '#94a3b8', pointerEvents: 'none', whiteSpace: 'nowrap',
-  },
   toast: (visible) => ({
     position: 'absolute', top: '14px', left: '50%',
     transform: `translateX(-50%) translateY(${visible ? 0 : '-8px'}px)`,
@@ -38,23 +29,6 @@ const s = {
     whiteSpace: 'nowrap', boxShadow: '0 4px 16px rgba(16,185,129,0.4)',
     opacity: visible ? 1 : 0, transition: 'all 0.3s',
   }),
-  locBadge: {
-    position: 'absolute', bottom: '80px', left: '16px', zIndex: 800,
-    display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px',
-    background: '#1e2130ee', backdropFilter: 'blur(8px)', border: '1px solid #2d3148',
-    borderRadius: '20px', fontSize: '11px', color: '#94a3b8',
-  },
-  locDot: (color) => ({
-    width: '7px', height: '7px', borderRadius: '50%', flexShrink: 0, background: color,
-  }),
-  // Manuel konum seç banner (GPS yokken)
-  manualBanner: {
-    position: 'absolute', top: '52px', left: '50%', transform: 'translateX(-50%)',
-    zIndex: 800, background: '#78350fee', backdropFilter: 'blur(8px)',
-    border: '1px solid #f59e0b44', borderRadius: '12px', padding: '8px 16px',
-    fontSize: '12px', color: '#fcd34d', display: 'flex', alignItems: 'center', gap: '8px',
-    maxWidth: '90%', textAlign: 'center',
-  },
   setupBanner: {
     position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(4px)',
     display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000,
@@ -69,14 +43,12 @@ export default function App() {
   const { fetchAlerts, subscribeToAlerts, addAlert } = useAlertStore()
   const { user, profile, init: initAuth, loading: authLoading, isAdmin } = useAuthStore()
   const {
-    location,
-    ipLocation,
-    gpsLocation,
-    manualLocation,
-    setManualLocation,
-    gpsStatus,
-    gpsAccuracy,
+    location, ipLocation, gpsLocation, manualLocation,
+    setManualLocation, gpsStatus, gpsAccuracy,
   } = useGeolocation()
+
+  const isMobile = useIsMobile()
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 768)
 
   const [clickedPos, setClickedPos]       = useState(null)
   const [modalOpen, setModalOpen]         = useState(false)
@@ -100,7 +72,6 @@ export default function App() {
     return () => { unsub(); clearInterval(interval) }
   }, [supabaseConfigured])
 
-  // GPS doğrulandığında haritaya uç
   const [hasFlownToGps, setHasFlownToGps] = useState(false)
   useEffect(() => {
     if (gpsLocation && !hasFlownToGps) {
@@ -109,13 +80,17 @@ export default function App() {
     }
   }, [gpsLocation, hasFlownToGps])
 
+  // Mobil'de sidebar açıkken kapat
+  useEffect(() => {
+    if (!isMobile) setSidebarOpen(true)
+  }, [isMobile])
+
   const showToast = useCallback((msg) => {
     setToast({ msg, visible: true })
     setTimeout(() => setToast((t) => ({ ...t, visible: false })), 3000)
   }, [])
 
   const handleMapClick = useCallback((pos) => {
-    // Manuel konum seçme modu
     if (manualPickMode) {
       setManualLocation({ ...pos, source: 'manual' })
       setManualPickMode(false)
@@ -131,7 +106,6 @@ export default function App() {
     }
   }, [user, manualPickMode, setManualLocation, showToast])
 
-  // Sağ tık → hızlı manuel konum ayarla
   const handleRightClick = useCallback((pos) => {
     setManualLocation({ ...pos, source: 'manual' })
     showToast('📌 Konum sağ tıkla ayarlandı')
@@ -171,21 +145,30 @@ export default function App() {
 
   const handleAlertClick = useCallback((alert) => {
     setFlyTarget({ lat: alert.lat, lng: alert.lng })
-  }, [])
+    if (isMobile) setSidebarOpen(false)
+  }, [isMobile])
 
-  // Konum rozeti içeriği
   const locationBadge = () => {
     if (gpsLocation) return { dot: '#10b981', text: `GPS ±${gpsAccuracy}m` }
     if (manualLocation) return { dot: '#6366f1', text: '📌 Manuel konum' }
     if (gpsStatus === 'unreliable') return { dot: '#f59e0b', text: `GPS güvenilmez (±${gpsAccuracy}m)` }
     if (gpsStatus === 'denied') return { dot: '#ef4444', text: 'GPS izni yok' }
-    if (ipLocation) return { dot: '#f59e0b', text: `Şehir: ${ipLocation.city || 'Bilinmiyor'} (IP)` }
+    if (ipLocation) return { dot: '#f59e0b', text: `${ipLocation.city || 'Bilinmiyor'} (IP)` }
     return { dot: '#64748b', text: 'Konum bekleniyor...' }
   }
   const badge = locationBadge()
 
-  // Masaüstü GPS yok uyarısı göster mi?
   const showManualHint = !gpsLocation && !manualLocation && (gpsStatus === 'unreliable' || gpsStatus === 'denied')
+
+  // Dinamik pozisyonlar
+  const fabBottom = isMobile ? '72px' : '24px'
+  const badgeBottom = isMobile ? '84px' : '80px'
+
+  const hintText = manualPickMode
+    ? '📌 Konumunuzu seçmek için haritaya tıklayın'
+    : user
+      ? isMobile ? '👆 Dokunun: uyarı ekle' : '🖱️ Sol tık: uyarı ekle  ·  Sağ tık: konumunu ayarla'
+      : '👁️ Misafir — uyarı eklemek için giriş yapın'
 
   if (!supabaseConfigured) {
     return (
@@ -229,6 +212,7 @@ VITE_SUPABASE_ANON_KEY=eyJ...`}
         <Header
           onLoginClick={() => setAuthModalOpen(true)}
           onAdminClick={() => setShowAdmin(true)}
+          isMobile={isMobile}
         />
         <div style={s.content}>
           <div style={s.mapWrapper}>
@@ -240,15 +224,18 @@ VITE_SUPABASE_ANON_KEY=eyJ...`}
               manualLocation={manualLocation}
               setManualLocation={setManualLocation}
               initialCenter={ipLocation}
+              isMobile={isMobile}
             />
 
             {/* Üst bilgi */}
-            <div style={s.hint}>
-              {manualPickMode
-                ? '📌 Konumunuzu seçmek için haritaya tıklayın'
-                : user
-                ? '🖱️ Sol tık: uyarı ekle  ·  Sağ tık: konumunu ayarla'
-                : '👁️ Misafir — uyarı eklemek için giriş yapın'}
+            <div style={{
+              position: 'absolute', top: '14px', left: '50%', transform: 'translateX(-50%)',
+              zIndex: 800, background: '#1e2130cc', backdropFilter: 'blur(8px)',
+              border: '1px solid #2d3148', borderRadius: '20px', padding: '7px 14px',
+              fontSize: isMobile ? '11px' : '12px', color: '#94a3b8',
+              pointerEvents: 'none', whiteSpace: 'nowrap', maxWidth: '90%', textAlign: 'center',
+            }}>
+              {hintText}
             </div>
 
             {/* Toast */}
@@ -256,8 +243,14 @@ VITE_SUPABASE_ANON_KEY=eyJ...`}
 
             {/* GPS unreliable uyarısı */}
             {showManualHint && (
-              <div style={s.manualBanner}>
-                ⚠️ Cihazınızda GPS yok veya sinyal zayıf — Sağ tıklayarak veya
+              <div style={{
+                position: 'absolute', top: '52px', left: '50%', transform: 'translateX(-50%)',
+                zIndex: 800, background: '#78350fee', backdropFilter: 'blur(8px)',
+                border: '1px solid #f59e0b44', borderRadius: '12px', padding: '8px 16px',
+                fontSize: '12px', color: '#fcd34d', display: 'flex', alignItems: 'center', gap: '8px',
+                maxWidth: '90%', textAlign: 'center',
+              }}>
+                ⚠️ GPS yok veya sinyal zayıf —
                 <button
                   onClick={() => setManualPickMode(true)}
                   style={{
@@ -266,20 +259,27 @@ VITE_SUPABASE_ANON_KEY=eyJ...`}
                     fontFamily: 'inherit', padding: '0 4px',
                   }}
                 >
-                  buraya tıklayarak
+                  konumunuzu manuel ayarlayın
                 </button>
-                konumunuzu manuel ayarlayın
               </div>
             )}
 
             {/* Konum rozeti */}
-            <div style={s.locBadge}>
-              <div style={s.locDot(badge.dot)} />
+            <div style={{
+              position: 'absolute', bottom: badgeBottom, left: '16px', zIndex: 800,
+              display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px',
+              background: '#1e2130ee', backdropFilter: 'blur(8px)', border: '1px solid #2d3148',
+              borderRadius: '20px', fontSize: '11px', color: '#94a3b8',
+            }}>
+              <div style={{ width: '7px', height: '7px', borderRadius: '50%', flexShrink: 0, background: badge.dot }} />
               {badge.text}
             </div>
 
             {/* FABs */}
-            <div style={s.fab}>
+            <div style={{
+              position: 'absolute', bottom: fabBottom, left: '50%', transform: 'translateX(-50%)',
+              zIndex: 800, display: 'flex', gap: '10px',
+            }}>
               {(gpsLocation || manualLocation) && (
                 <button
                   style={s.fabBtn(false)}
@@ -287,7 +287,7 @@ VITE_SUPABASE_ANON_KEY=eyJ...`}
                   onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#6366f1')}
                   onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#2d3148')}
                 >
-                  📍 Konumuma Git
+                  📍 {isMobile ? 'Konum' : 'Konumuma Git'}
                 </button>
               )}
               {!gpsLocation && !manualLocation && (
@@ -297,7 +297,7 @@ VITE_SUPABASE_ANON_KEY=eyJ...`}
                   onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#6366f1')}
                   onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#2d3148')}
                 >
-                  📌 Konumumu Seç
+                  📌 {isMobile ? 'Konum Seç' : 'Konumumu Seç'}
                 </button>
               )}
               <button
@@ -306,14 +306,30 @@ VITE_SUPABASE_ANON_KEY=eyJ...`}
                 onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.9')}
                 onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
               >
-                ＋ Uyarı Yayınla
+                ＋ {isMobile ? 'Uyarı' : 'Uyarı Yayınla'}
               </button>
             </div>
           </div>
 
-          <AlertSidebar onAlertClick={handleAlertClick} />
+          {!isMobile && (
+            <AlertSidebar
+              onAlertClick={handleAlertClick}
+              open={sidebarOpen}
+              setOpen={setSidebarOpen}
+              isMobile={false}
+            />
+          )}
         </div>
       </div>
+
+      {isMobile && (
+        <AlertSidebar
+          onAlertClick={handleAlertClick}
+          open={sidebarOpen}
+          setOpen={setSidebarOpen}
+          isMobile={true}
+        />
+      )}
 
       {modalOpen && (
         <AddAlertModal
