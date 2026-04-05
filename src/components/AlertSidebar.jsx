@@ -78,18 +78,16 @@ function AlertCard({ alert, onDetailClick, onUserClick, onMapClick }) {
         onClick={(e) => handleVote(e, type)}
         style={{
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 3,
-          padding: '4px 7px', borderRadius: 6, cursor: user ? 'pointer' : 'default',
+          padding: '3px 8px', height: 26, borderRadius: 6, cursor: user ? 'pointer' : 'default',
           border: active ? `1px solid ${isLike ? '#10b98166' : '#ef444466'}` : '1px solid #2d3148',
-          background: active ? (isLike ? '#10b98118' : '#ef444418') : 'none',
+          background: active ? (isLike ? '#10b98118' : '#ef444418') : 'transparent',
           color: active ? (isLike ? '#10b981' : '#ef4444') : '#64748b',
-          fontSize: 11, fontWeight: 600, lineHeight: 1, transition: 'all 0.15s',
+          fontSize: 11, fontWeight: 600, lineHeight: '26px', transition: 'all 0.15s',
           opacity: voting && voting !== type ? 0.5 : 1,
-          flexShrink: 0, minWidth: 0,
-          WebkitTapHighlightColor: 'transparent',
+          flexShrink: 0,
         }}
       >
-        <span style={{ fontSize: 12, lineHeight: 1, display: 'block' }}>{isLike ? '👍' : '👎'}</span>
-        <span style={{ lineHeight: 1 }}>{count}</span>
+        {isLike ? '👍' : '👎'} {count}
       </button>
     )
   }
@@ -156,8 +154,8 @@ function AlertCard({ alert, onDetailClick, onUserClick, onMapClick }) {
 
       {/* Footer: oy + ayrıntı */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 5, padding: '6px 10px',
-        borderTop: '1px solid #1a1d27', overflow: 'hidden',
+        display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px',
+        borderTop: '1px solid #1a1d27',
       }}>
         {voteBtn('like')}
         {voteBtn('dislike')}

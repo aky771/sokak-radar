@@ -435,7 +435,7 @@ VITE_SUPABASE_ANON_KEY=eyJ...`}
             </div>}
 
             {/* FABs */}
-            <div style={{
+            {!(isMobile && sidebarOpen) && <div style={{
               position: 'absolute', bottom: fabBottom, left: '50%', transform: 'translateX(-50%)',
               zIndex: 800, display: 'flex', gap: '10px',
             }}>
@@ -468,7 +468,7 @@ VITE_SUPABASE_ANON_KEY=eyJ...`}
                 <span style={{ fontSize: '17px', lineHeight: 1 }}>+</span>
                 {isMobile ? 'Uyarı' : 'Uyarı Yayınla'}
               </button>
-            </div>
+            </div>}
           </div>
 
           {!isMobile && <AlertSidebar {...sidebarProps} isMobile={false} />}

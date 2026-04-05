@@ -46,18 +46,23 @@ export default function UserProfileModal({ userId, username: fallbackUsername, o
     if (isOwn && myProfile) {
       setProfile(myProfile)
       setLoading(false)
-    } else {
-      supabase.from('profiles').select('*').eq('id', userId).maybeSingle()
-        .then(({ data }) => {
-          // If no profile row, build a minimal one from fallback username
-          setProfile(data || (fallbackUsername ? {
-            id: userId, username: fallbackUsername,
+      return
+    }
+    supabase.from('profiles').select('*').eq('id', userId).maybeSingle()
+      .then(({ data }) => {
+        if (data) {
+          setProfile(data)
+        } else {
+          // Profile row missing — build minimal display from available fallback info
+          const nameHint = fallbackUsername || (isOwn ? user?.email?.split('@')[0] : null)
+          setProfile(nameHint ? {
+            id: userId, username: nameHint,
             display_name: null, bio: null, avatar_color: '#6366f1',
             alert_count: 0, created_at: null,
-          } : null))
-          setLoading(false)
-        })
-    }
+          } : null)
+        }
+        setLoading(false)
+      })
   }, [userId, myProfile, isOwn])
 
   useEffect(() => {
