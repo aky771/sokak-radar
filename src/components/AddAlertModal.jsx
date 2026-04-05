@@ -8,7 +8,7 @@ const MIN_ZOOM_FOR_ALERT = 13
 
 export default function AddAlertModal({ position, onClose, onAdd, userLocation, currentZoom }) {
   const isMobile = useIsMobile()
-  const [type, setType]               = useState('traffic')
+  const [type, setType]               = useState('hazard')
   const [description, setDescription] = useState('')
   const [photo, setPhoto]             = useState(null)
   const [useGPS, setUseGPS]           = useState(false)
