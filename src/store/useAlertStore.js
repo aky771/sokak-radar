@@ -124,29 +124,61 @@ const useAlertStore = create((set, get) => ({
 
   // like veya dislike at — toggle, 8+ dislike = otomatik silme
   voteOnAlert: async (alertId, voteType) => {
+    // --- Optimistik güncelleme: sunucu yanıtı beklemeden UI'ı hemen güncelle ---
+    const prevState = get()
+    const prevVote  = prevState.userVotes[alertId]
+    const alert     = prevState.alerts.find((a) => a.id === alertId)
+    if (alert) {
+      const isToggle    = prevVote === voteType          // aynı oya tekrar tıklandı → geri çek
+      const newVote     = isToggle ? null : voteType
+      const likeAdj     = voteType === 'like'    ? (isToggle ? -1 : prevVote === 'dislike' ? 1 : 1) : (prevVote === 'like'    ? -1 : 0)
+      const dislikeAdj  = voteType === 'dislike' ? (isToggle ? -1 : prevVote === 'like'    ? 1 : 1) : (prevVote === 'dislike' ? -1 : 0)
+      set((state) => {
+        const newVotes = { ...state.userVotes }
+        if (newVote) newVotes[alertId] = newVote
+        else delete newVotes[alertId]
+        return {
+          userVotes: newVotes,
+          alerts: state.alerts.map((a) =>
+            a.id === alertId
+              ? { ...a, like_count: Math.max(0, (a.like_count||0) + likeAdj), dislike_count: Math.max(0, (a.dislike_count||0) + dislikeAdj) }
+              : a
+          ),
+        }
+      })
+    }
+
+    // --- Sunucu çağrısı ---
     const { data, error } = await supabase.rpc('vote_on_alert', {
       p_alert_id: alertId,
       p_vote_type: voteType,
     })
-    if (!error && data) {
+
+    if (error) {
+      // Hata varsa optimistik değişikliği geri al
+      set({ alerts: prevState.alerts, userVotes: prevState.userVotes })
+      return { data: null, error }
+    }
+
+    // Sunucudan gelen gerçek sayılarla güncelle (array veya obje olabilir)
+    const result = Array.isArray(data) ? data[0] : data
+    const parsed = typeof result === 'string' ? JSON.parse(result) : result
+    if (parsed) {
       set((state) => {
-        const newAlerts = data.deleted
+        const newVotes = { ...state.userVotes }
+        if (parsed.user_vote) newVotes[alertId] = parsed.user_vote
+        else delete newVotes[alertId]
+        const newAlerts = parsed.deleted
           ? state.alerts.filter((a) => a.id !== alertId)
           : state.alerts.map((a) =>
               a.id === alertId
-                ? { ...a, like_count: data.like_count, dislike_count: data.dislike_count }
+                ? { ...a, like_count: parsed.like_count ?? a.like_count, dislike_count: parsed.dislike_count ?? a.dislike_count }
                 : a
             )
-        const newVotes = { ...state.userVotes }
-        if (data.user_vote) {
-          newVotes[alertId] = data.user_vote
-        } else {
-          delete newVotes[alertId]
-        }
         return { alerts: newAlerts, userVotes: newVotes }
       })
     }
-    return { data, error }
+    return { data: parsed, error: null }
   },
 }))
 

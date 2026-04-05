@@ -74,7 +74,13 @@ function AlertCard({ alert, onDetailClick, onUserClick, onMapClick, userLocation
 
   const handleVote = async (e, type) => {
     e.stopPropagation()
-    if (!user || voting) return
+    if (voting) return
+    if (!user) {
+      // Giriş yapılmamış — butona tıklanınca görsel feedback
+      e.currentTarget.style.borderColor = '#ef4444'
+      setTimeout(() => { if (e.currentTarget) e.currentTarget.style.borderColor = '' }, 600)
+      return
+    }
     setVoting(type)
     await voteOnAlert(alert.id, type)
     setVoting(null)
@@ -111,6 +117,7 @@ function AlertCard({ alert, onDetailClick, onUserClick, onMapClick, userLocation
         background: '#1e2130',
         border: `1px solid ${hovered ? info.color + '55' : '#2d3148'}`,
         borderRadius: 10, overflow: 'hidden', transition: 'border-color 0.15s',
+        marginBottom: 6,
       }}
     >
       {/* Kart başlığı */}
@@ -252,8 +259,7 @@ const ms = {
     overflowY: 'scroll',
     WebkitOverflowScrolling: 'touch',
     overscrollBehavior: 'contain',
-    padding: '8px 10px',
-    display: 'flex', flexDirection: 'column', gap: '6px',
+    padding: '8px 10px 24px',
   },
 }
 
@@ -269,8 +275,8 @@ const sh = {
     color: active ? '#818cf8' : '#64748b', transition: 'all 0.15s',
   }),
   list: {
-    flex: 1, minHeight: 0, overflowY: 'auto', padding: '8px 10px',
-    display: 'flex', flexDirection: 'column', gap: '6px',
+    flex: 1, minHeight: 0, overflowY: 'auto',
+    padding: '8px 10px 16px',
     WebkitOverflowScrolling: 'touch',
   },
   empty: { textAlign: 'center', padding: '40px 16px', color: '#64748b', fontSize: '13px' },
