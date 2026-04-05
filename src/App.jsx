@@ -74,7 +74,7 @@ export default function App() {
   const [toast, setToast]                       = useState({ msg: '', visible: false })
   const [manualPickMode, setManualPickMode]     = useState(false)
   const [detailAlert, setDetailAlert]           = useState(null)   // AlertDetailModal
-  const [profileUserId, setProfileUserId]       = useState(null)   // UserProfileModal
+  const [profileUser, setProfileUser]            = useState(null)   // { id, username } for UserProfileModal
 
   // Yakın uyarı bildirimi
   const [nearbyAlert, setNearbyAlert] = useState(null)
@@ -184,8 +184,8 @@ export default function App() {
     setDetailAlert(alert)
   }, [])
 
-  const handleUserClick = useCallback((userId) => {
-    if (userId) setProfileUserId(userId)
+  const handleUserClick = useCallback((userId, username) => {
+    if (userId) setProfileUser({ id: userId, username })
   }, [])
 
   const locationBadge = () => {
@@ -269,7 +269,7 @@ VITE_SUPABASE_ANON_KEY=eyJ...`}
         <Header
           onLoginClick={() => setAuthModalOpen(true)}
           onAdminClick={() => setShowAdmin(true)}
-          onProfileClick={() => user && setProfileUserId(user.id)}
+          onProfileClick={() => user && setProfileUser({ id: user.id, username: profile?.username })}
           isMobile={isMobile}
         />
         <div style={s.content}>
@@ -350,7 +350,7 @@ VITE_SUPABASE_ANON_KEY=eyJ...`}
             )}
 
             {/* Konum izni yok / GPS hatası */}
-            {showManualHint && (
+            {showManualHint && !(isMobile && sidebarOpen) && (
               <div style={{
                 position: 'absolute', top: nearbyAlert ? '108px' : '52px',
                 left: '50%', transform: 'translateX(-50%)',
@@ -416,7 +416,7 @@ VITE_SUPABASE_ANON_KEY=eyJ...`}
             )}
 
             {/* Konum rozeti */}
-            <div
+            {!(isMobile && sidebarOpen) && <div
               onClick={(gpsStatus === 'denied' || gpsStatus === 'error') ? requestLocation : undefined}
               style={{
                 position: 'absolute', bottom: badgeBottom, left: '16px', zIndex: 800,
@@ -432,7 +432,7 @@ VITE_SUPABASE_ANON_KEY=eyJ...`}
               <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {badge.text}
               </span>
-            </div>
+            </div>}
 
             {/* FABs */}
             <div style={{
@@ -498,14 +498,15 @@ VITE_SUPABASE_ANON_KEY=eyJ...`}
         <AlertDetailModal
           alert={detailAlert}
           onClose={() => setDetailAlert(null)}
-          onUserClick={(uid) => { setDetailAlert(null); setProfileUserId(uid) }}
+          onUserClick={(uid, uname) => { setDetailAlert(null); setProfileUser({ id: uid, username: uname }) }}
         />
       )}
 
-      {profileUserId && (
+      {profileUser && (
         <UserProfileModal
-          userId={profileUserId}
-          onClose={() => setProfileUserId(null)}
+          userId={profileUser.id}
+          username={profileUser.username}
+          onClose={() => setProfileUser(null)}
           onAlertFocus={(alert) => {
             handleAlertClick(alert)
             setDetailAlert(alert)

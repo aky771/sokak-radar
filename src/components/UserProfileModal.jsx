@@ -29,7 +29,7 @@ function timeAgo(iso) {
   return `${Math.floor(d / 86400)} gün önce`
 }
 
-export default function UserProfileModal({ userId, onClose, onAlertFocus }) {
+export default function UserProfileModal({ userId, username: fallbackUsername, onClose, onAlertFocus }) {
   const { user, profile: myProfile, updateProfile } = useAuthStore()
   const { alerts } = useAlertStore()
   const isMobile = useIsMobile()
@@ -47,9 +47,14 @@ export default function UserProfileModal({ userId, onClose, onAlertFocus }) {
       setProfile(myProfile)
       setLoading(false)
     } else {
-      supabase.from('profiles').select('*').eq('id', userId).single()
+      supabase.from('profiles').select('*').eq('id', userId).maybeSingle()
         .then(({ data }) => {
-          setProfile(data)
+          // If no profile row, build a minimal one from fallback username
+          setProfile(data || (fallbackUsername ? {
+            id: userId, username: fallbackUsername,
+            display_name: null, bio: null, avatar_color: '#6366f1',
+            alert_count: 0, created_at: null,
+          } : null))
           setLoading(false)
         })
     }
@@ -175,9 +180,11 @@ export default function UserProfileModal({ userId, onClose, onAlertFocus }) {
                     <div style={{ fontSize: profile.display_name ? 13 : 17, fontWeight: profile.display_name ? 400 : 700, color: profile.display_name ? '#94a3b8' : '#f1f5f9' }}>
                       @{profile.username}
                     </div>
-                    <div style={{ fontSize: 11, color: '#475569', marginTop: 3 }}>
-                      {new Date(profile.created_at).toLocaleDateString('tr-TR', { year: 'numeric', month: 'long' })} üyesi
-                    </div>
+                    {profile.created_at && (
+                      <div style={{ fontSize: 11, color: '#475569', marginTop: 3 }}>
+                        {new Date(profile.created_at).toLocaleDateString('tr-TR', { year: 'numeric', month: 'long' })} üyesi
+                      </div>
+                    )}
                   </>
                 )}
               </div>

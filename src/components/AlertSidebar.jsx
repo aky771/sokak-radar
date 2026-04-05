@@ -77,17 +77,19 @@ function AlertCard({ alert, onDetailClick, onUserClick, onMapClick }) {
       <button
         onClick={(e) => handleVote(e, type)}
         style={{
-          display: 'flex', alignItems: 'center', gap: 4,
-          padding: '4px 8px', borderRadius: 6, cursor: user ? 'pointer' : 'default',
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 3,
+          padding: '4px 7px', borderRadius: 6, cursor: user ? 'pointer' : 'default',
           border: active ? `1px solid ${isLike ? '#10b98166' : '#ef444466'}` : '1px solid #2d3148',
           background: active ? (isLike ? '#10b98118' : '#ef444418') : 'none',
           color: active ? (isLike ? '#10b981' : '#ef4444') : '#64748b',
-          fontSize: 11, fontWeight: 600, transition: 'all 0.15s',
+          fontSize: 11, fontWeight: 600, lineHeight: 1, transition: 'all 0.15s',
           opacity: voting && voting !== type ? 0.5 : 1,
+          flexShrink: 0, minWidth: 0,
+          WebkitTapHighlightColor: 'transparent',
         }}
       >
-        <span style={{ fontSize: 13 }}>{isLike ? '👍' : '👎'}</span>
-        <span>{count}</span>
+        <span style={{ fontSize: 12, lineHeight: 1, display: 'block' }}>{isLike ? '👍' : '👎'}</span>
+        <span style={{ lineHeight: 1 }}>{count}</span>
       </button>
     )
   }
@@ -154,17 +156,18 @@ function AlertCard({ alert, onDetailClick, onUserClick, onMapClick }) {
 
       {/* Footer: oy + ayrıntı */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px',
-        borderTop: '1px solid #1a1d27',
+        display: 'flex', alignItems: 'center', gap: 5, padding: '6px 10px',
+        borderTop: '1px solid #1a1d27', overflow: 'hidden',
       }}>
         {voteBtn('like')}
         {voteBtn('dislike')}
         <button
           onClick={() => onDetailClick(alert)}
           style={{
-            marginLeft: 'auto', padding: '4px 10px', borderRadius: 6,
+            marginLeft: 'auto', padding: '4px 9px', borderRadius: 6,
             border: '1px solid #2d3148', background: 'none',
             color: '#64748b', fontSize: 11, cursor: 'pointer',
+            flexShrink: 0, lineHeight: 1,
           }}
         >
           Ayrıntı ›
