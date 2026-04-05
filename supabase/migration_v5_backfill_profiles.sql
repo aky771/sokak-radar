@@ -22,18 +22,19 @@ ON CONFLICT (id) DO NOTHING;
 
 -- 2. Admin için tüm kullanıcıları döndüren güvenli fonksiyon
 --    (auth.users'a doğrudan client erişimi yoktur; bu fonksiyon service-definer olarak çalışır)
+--    alert_count: profiles.alert_count yerine alerts tablosundan gerçek sayı çekilir
 CREATE OR REPLACE FUNCTION admin_get_all_users()
 RETURNS TABLE (
-  id          UUID,
-  email       TEXT,
-  username    TEXT,
+  id           UUID,
+  email        TEXT,
+  username     TEXT,
   display_name TEXT,
-  bio         TEXT,
+  bio          TEXT,
   avatar_color TEXT,
-  is_blocked  BOOLEAN,
-  is_admin    BOOLEAN,
-  alert_count INTEGER,
-  created_at  TIMESTAMPTZ,
+  is_blocked   BOOLEAN,
+  is_admin     BOOLEAN,
+  alert_count  INTEGER,
+  created_at   TIMESTAMPTZ,
   last_sign_in TIMESTAMPTZ
 ) AS $$
 BEGIN
@@ -51,7 +52,8 @@ BEGIN
     p.avatar_color,
     COALESCE(p.is_blocked, FALSE),
     COALESCE(p.is_admin, FALSE),
-    COALESCE(p.alert_count, 0),
+    -- Gerçek uyarı sayısını alerts tablosundan say (denormalize sayaç güvenilmez)
+    (SELECT COUNT(*)::INTEGER FROM alerts a WHERE a.user_id = u.id),
     u.created_at,
     u.last_sign_in_at
   FROM auth.users u
