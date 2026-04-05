@@ -1,7 +1,18 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import useAlertStore, { ALERT_TYPES } from '../store/useAlertStore'
 import useAuthStore from '../store/useAuthStore'
 import { reverseGeocode } from '../utils/geocode'
+
+function distKm(lat1, lng1, lat2, lng2) {
+  const R = 6371, dLat = (lat2 - lat1) * Math.PI / 180, dLng = (lng2 - lng1) * Math.PI / 180
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+}
+
+function distLabel(km) {
+  if (km < 1) return `${Math.round(km * 1000)} m`
+  return `${km.toFixed(1)} km`
+}
 
 function timeAgo(iso) {
   if (!iso) return ''
@@ -51,7 +62,7 @@ function useAddress(alert) {
 }
 
 // Tek kart bileşeni
-function AlertCard({ alert, onDetailClick, onUserClick, onMapClick }) {
+function AlertCard({ alert, onDetailClick, onUserClick, onMapClick, userLocation }) {
   const { voteOnAlert, userVotes } = useAlertStore()
   const { user } = useAuthStore()
   const [voting, setVoting] = useState(null)
@@ -105,7 +116,7 @@ function AlertCard({ alert, onDetailClick, onUserClick, onMapClick }) {
       {/* Kart başlığı */}
       <div
         onClick={() => onMapClick(alert)}
-        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px 6px', cursor: 'pointer' }}
+        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 12px 6px', cursor: 'pointer' }}
       >
         <span style={{
           display: 'inline-flex', alignItems: 'center', gap: 4,
@@ -115,6 +126,14 @@ function AlertCard({ alert, onDetailClick, onUserClick, onMapClick }) {
         }}>
           {info.emoji} {info.label}
         </span>
+        {userLocation && (
+          <span style={{
+            fontSize: 10, color: '#6366f1aa', fontWeight: 600, flexShrink: 0,
+            background: '#6366f111', padding: '1px 6px', borderRadius: 4,
+          }}>
+            📍 {distLabel(distKm(userLocation.lat, userLocation.lng, alert.lat, alert.lng))}
+          </span>
+        )}
         <span style={{ fontSize: 10, color: '#475569', marginLeft: 'auto', flexShrink: 0 }}>
           {timeAgo(alert.created_at)}
         </span>
@@ -227,22 +246,35 @@ const sh = {
     color: active ? '#818cf8' : '#64748b', transition: 'all 0.15s',
   }),
   list: {
-    flex: 1, overflowY: 'auto', padding: '8px 10px',
+    flex: 1, minHeight: 0, overflowY: 'auto', padding: '8px 10px',
     display: 'flex', flexDirection: 'column', gap: '6px',
+    WebkitOverflowScrolling: 'touch',
   },
   empty: { textAlign: 'center', padding: '40px 16px', color: '#64748b', fontSize: '13px' },
 }
 
-export default function AlertSidebar({ onAlertClick, onDetailClick, onUserClick, open, setOpen, isMobile }) {
+export default function AlertSidebar({ onAlertClick, onDetailClick, onUserClick, open, setOpen, isMobile, userLocation }) {
   const alerts = useAlertStore((st) => st.alerts)
   const [filter, setFilter] = useState('all')
 
-  const filtered = filter === 'all' ? alerts : alerts.filter((a) => a.type === filter)
+  // Yakınlığa göre sırala (konum varsa), yoksa en yeni önce
+  const sorted = useMemo(() => {
+    const base = filter === 'all' ? alerts : alerts.filter((a) => a.type === filter)
+    if (!userLocation) return base
+    return [...base].sort((a, b) => {
+      const da = distKm(userLocation.lat, userLocation.lng, a.lat, a.lng)
+      const db = distKm(userLocation.lat, userLocation.lng, b.lat, b.lng)
+      return da - db
+    })
+  }, [alerts, filter, userLocation])
 
-  const alertList = (
+  const alertListContent = (
     <>
       <div style={sh.head}>
-        <div style={sh.headTitle}>Uyarılar ({filtered.length})</div>
+        <div style={sh.headTitle}>
+          Uyarılar ({sorted.length})
+          {userLocation && <span style={{ fontSize: 10, color: '#6366f188', fontWeight: 400, marginLeft: 6 }}>• yakına göre sıralı</span>}
+        </div>
         <div style={sh.filterRow}>
           <button style={sh.filterBtn(filter === 'all')} onClick={() => setFilter('all')}>Tümü</button>
           {Object.entries(ALERT_TYPES).map(([key, info]) => (
@@ -254,20 +286,21 @@ export default function AlertSidebar({ onAlertClick, onDetailClick, onUserClick,
       </div>
 
       <div style={sh.list}>
-        {filtered.length === 0 && (
+        {sorted.length === 0 && (
           <div style={sh.empty}>
             <div style={{ fontSize: '28px', marginBottom: '8px' }}>🗺️</div>
             Henüz uyarı yok.
             <br /><span style={{ fontSize: '11px' }}>Haritaya tıklayarak ekleyin.</span>
           </div>
         )}
-        {filtered.map((alert) => (
+        {sorted.map((alert) => (
           <AlertCard
             key={alert.id}
             alert={alert}
             onMapClick={onAlertClick}
             onDetailClick={onDetailClick}
             onUserClick={onUserClick}
+            userLocation={userLocation}
           />
         ))}
       </div>
@@ -277,13 +310,14 @@ export default function AlertSidebar({ onAlertClick, onDetailClick, onUserClick,
   if (isMobile) {
     return (
       <div style={ms.sheet(open)}>
+        {/* Sürükleme çubuğu + başlık */}
         <div style={ms.handle} onClick={() => setOpen(!open)}>
           <div style={{
             position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)',
             width: 36, height: 4, borderRadius: 2, background: '#3d4460',
           }} />
           <span style={{ fontSize: 14, fontWeight: 700, color: '#f1f5f9' }}>
-            {open ? 'Uyarılar' : `Uyarılar (${filtered.length})`}
+            {open ? 'Uyarılar' : `Uyarılar (${sorted.length})`}
           </span>
           <span style={{
             fontSize: 18, color: '#64748b',
@@ -291,7 +325,10 @@ export default function AlertSidebar({ onAlertClick, onDetailClick, onUserClick,
             transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
           }}>⌃</span>
         </div>
-        {alertList}
+        {/* İçerik — minHeight:0 ile flex shrink çalışır, liste scroll'lanabilir */}
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          {alertListContent}
+        </div>
       </div>
     )
   }
@@ -301,7 +338,7 @@ export default function AlertSidebar({ onAlertClick, onDetailClick, onUserClick,
       <button style={ds.toggle} onClick={() => setOpen(!open)}>
         {open ? '›' : '‹'}
       </button>
-      {alertList}
+      {alertListContent}
     </div>
   )
 }

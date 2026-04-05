@@ -311,6 +311,7 @@ VITE_SUPABASE_ANON_KEY=eyJ...`}
     onUserClick: handleUserClick,
     open: sidebarOpen,
     setOpen: setSidebarOpen,
+    userLocation: location,
   }
 
   return (

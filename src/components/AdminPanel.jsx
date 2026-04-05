@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import useAuthStore from '../store/useAuthStore'
 import { ALERT_TYPES } from '../store/useAlertStore'
@@ -43,7 +43,7 @@ const s = {
     cursor: 'pointer', fontSize: '13px', fontWeight: 600,
   },
   content: { flex: 1, overflow: 'auto', padding: '24px' },
-  statsRow: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' },
+  statsRow: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '16px', marginBottom: '24px' },
   statCard: {
     background: '#1e2130', border: '1px solid #2d3148', borderRadius: '12px', padding: '16px 20px',
   },
@@ -100,18 +100,27 @@ export default function AdminPanel({ onClose }) {
   const { signOut } = useAuthStore()
   const [profiles, setProfiles] = useState([])
   const [stats, setStats] = useState({ users: 0, activeAlerts: 0, blocked: 0, totalAlerts: 0 })
+  const [activeUsers, setActiveUsers] = useState([])  // son 1 saatte uyarı paylaşanlar
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [viewingUser, setViewingUser] = useState(null)
   const [userAlerts, setUserAlerts] = useState([])
   const [alertsLoading, setAlertsLoading] = useState(false)
+  const refreshRef = useRef(null)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
-    const [profilesRes, activeAlertsRes, totalAlertsRes] = await Promise.all([
+    const now = new Date().toISOString()
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+
+    const [profilesRes, activeAlertsRes, totalAlertsRes, recentAlertsRes] = await Promise.all([
       supabase.from('profiles').select('*').order('created_at', { ascending: false }),
-      supabase.from('alerts').select('id', { count: 'exact' }).gt('expires_at', new Date().toISOString()),
+      supabase.from('alerts').select('id', { count: 'exact' }).gt('expires_at', now),
       supabase.from('alerts').select('id', { count: 'exact' }),
+      supabase.from('alerts')
+        .select('user_id, username, type, created_at, lat, lng')
+        .gt('created_at', oneHourAgo)
+        .order('created_at', { ascending: false }),
     ])
 
     const all = profilesRes.data || []
@@ -122,10 +131,23 @@ export default function AdminPanel({ onClose }) {
       blocked: all.filter((p) => p.is_blocked).length,
       totalAlerts: totalAlertsRes.count || 0,
     })
+
+    // Son 1 saatte uyarı gönderen kullanıcıları unique olarak listele
+    const recentMap = {}
+    ;(recentAlertsRes.data || []).forEach((a) => {
+      if (!recentMap[a.user_id]) recentMap[a.user_id] = { ...a, alertCount: 0 }
+      recentMap[a.user_id].alertCount++
+    })
+    setActiveUsers(Object.values(recentMap))
     setLoading(false)
   }, [])
 
-  useEffect(() => { fetchData() }, [fetchData])
+  useEffect(() => {
+    fetchData()
+    // Her 30 saniyede otomatik yenile
+    refreshRef.current = setInterval(fetchData, 30_000)
+    return () => clearInterval(refreshRef.current)
+  }, [fetchData])
 
   const toggleBlock = async (profile) => {
     const newStatus = !profile.is_blocked
@@ -174,14 +196,24 @@ export default function AdminPanel({ onClose }) {
         <span style={{ fontSize: '22px' }}>🛡️</span>
         <div style={s.topbarTitle}>Admin Paneli</div>
         <span style={{ fontSize: '12px', color: '#475569' }}>Sokak Radar Yönetim</span>
-        <button
-          style={s.closeBtn}
-          onClick={async () => { await signOut(); onClose() }}
-          onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#ef4444')}
-          onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#2d3148')}
-        >
-          Çıkış Yap & Kapat
-        </button>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+          <button
+            style={{ ...s.closeBtn, marginLeft: 0 }}
+            onClick={onClose}
+            onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#6366f1')}
+            onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#2d3148')}
+          >
+            ← Geri Dön
+          </button>
+          <button
+            style={{ ...s.closeBtn, marginLeft: 0 }}
+            onClick={async () => { await signOut(); onClose() }}
+            onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#ef4444')}
+            onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#2d3148')}
+          >
+            Çıkış Yap
+          </button>
+        </div>
       </div>
 
       <div style={s.content}>
@@ -199,6 +231,49 @@ export default function AdminPanel({ onClose }) {
               <div style={s.statSub}>{st.sub}</div>
             </div>
           ))}
+        </div>
+
+        {/* Aktif Kullanıcılar */}
+        <div style={{ marginBottom: '24px' }}>
+          <div style={{ ...s.sectionTitle, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#10b981', display: 'inline-block', boxShadow: '0 0 6px #10b981' }} />
+            Aktif Kullanıcılar
+            <span style={{ fontSize: 12, fontWeight: 400, color: '#475569' }}>— Son 1 saat</span>
+            <span style={{
+              marginLeft: 'auto', fontSize: 11, color: '#6366f1', background: '#6366f111',
+              padding: '2px 8px', borderRadius: 6, fontWeight: 600,
+            }}>{activeUsers.length} online</span>
+          </div>
+          {activeUsers.length === 0 ? (
+            <div style={{ color: '#475569', fontSize: 13, padding: '16px', background: '#1e2130', borderRadius: 10, border: '1px solid #2d3148' }}>
+              Son 1 saatte aktif kullanıcı yok.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {activeUsers.map((u) => {
+                const info = ALERT_TYPES[u.type] || ALERT_TYPES.spotted
+                return (
+                  <div key={u.user_id} style={{
+                    background: '#1e2130', border: '1px solid #10b98133',
+                    borderRadius: 10, padding: '10px 14px',
+                    display: 'flex', alignItems: 'center', gap: 10, minWidth: 200,
+                  }}>
+                    <div style={{
+                      width: 10, height: 10, borderRadius: '50%', background: '#10b981', flexShrink: 0,
+                      boxShadow: '0 0 6px #10b981',
+                    }} />
+                    <Avatar username={u.username} size={28} />
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>{u.username || 'Anonim'}</div>
+                      <div style={{ fontSize: 11, color: '#64748b' }}>
+                        {info.emoji} {u.alertCount} uyarı · {timeAgo(u.created_at)}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
 
         {/* Users table */}
