@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import useAlertStore, { ALERT_TYPES } from '../store/useAlertStore'
 import useAuthStore from '../store/useAuthStore'
 import useIsMobile from '../hooks/useIsMobile'
+import useProfileCache from '../hooks/useProfileCache'
 
 function timeAgo(iso) {
   if (!iso) return ''
@@ -58,9 +59,13 @@ export default function AlertDetailModal({ alert, onClose, onUserClick }) {
   const myVote = userVotes[alert.id]
   const isOwn = user && alert.user_id === user.id
 
-  // Kendi uyarısında canlı profil verisi kullan
-  const displayUsername = isOwn && profile?.username ? profile.username : alert.username
-  const avatarColor = isOwn && profile?.avatar_color ? profile.avatar_color : '#6366f1'
+  const cachedProfile = useProfileCache(isOwn ? null : alert.user_id)
+  const displayUsername = isOwn
+    ? (profile?.username || alert.username)
+    : (cachedProfile?.username || alert.username)
+  const avatarColor = isOwn
+    ? (profile?.avatar_color || '#6366f1')
+    : (cachedProfile?.avatar_color || '#6366f1')
 
   const handleVote = async (type) => {
     if (!user) return

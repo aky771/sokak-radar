@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react'
 import useAlertStore, { ALERT_TYPES } from '../store/useAlertStore'
 import useAuthStore from '../store/useAuthStore'
 import { reverseGeocode } from '../utils/geocode'
+import useProfileCache from '../hooks/useProfileCache'
 
 function distKm(lat1, lng1, lat2, lng2) {
   const R = 6371, dLat = (lat2 - lat1) * Math.PI / 180, dLng = (lng2 - lng1) * Math.PI / 180
@@ -69,10 +70,15 @@ function AlertCard({ alert, onDetailClick, onUserClick, onMapClick, userLocation
   const [hovered, setHovered] = useState(false)
   const address = useAddress(alert)
 
-  // Kendi uyarılarında canlı profil verisi kullan (renk/kullanıcı adı değişince anında yansısın)
   const isOwn = alert.user_id === user?.id
-  const displayUsername = isOwn && profile?.username ? profile.username : alert.username
-  const avatarColor = isOwn && profile?.avatar_color ? profile.avatar_color : '#6366f188'
+  // Kendi uyarısı → canlı profil; başkasının uyarısı → cache'den profil çek
+  const cachedProfile = useProfileCache(isOwn ? null : alert.user_id)
+  const displayUsername = isOwn
+    ? (profile?.username || alert.username)
+    : (cachedProfile?.username || alert.username)
+  const avatarColor = isOwn
+    ? (profile?.avatar_color || '#6366f1')
+    : (cachedProfile?.avatar_color || '#6366f1')
 
   const info = ALERT_TYPES[alert.type] || ALERT_TYPES.spotted
   const myVote = userVotes[alert.id]

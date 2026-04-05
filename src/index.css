@@ -65,6 +65,35 @@ html, body, #root {
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 
+/* Leaflet harita arka planı — tile yüklenirken beyaz yanıp sönmesini engeller */
+.leaflet-container {
+  background: #0f1117;
+}
+
+/* Attribution: OSM/CARTO zorunlu ama göze batmamalı */
+.leaflet-control-attribution {
+  background: rgba(10, 12, 18, 0.55) !important;
+  color: #334155 !important;
+  font-size: 9px !important;
+  padding: 1px 5px !important;
+  opacity: 0.45;
+  transition: opacity 0.25s;
+  max-width: 280px !important;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.leaflet-control-attribution:hover {
+  opacity: 0.9;
+}
+.leaflet-control-attribution a {
+  color: #475569 !important;
+}
+/* Leaflet v1.9 Ukrayna bayrağı ikonunu gizle */
+.leaflet-attribution-flag {
+  display: none !important;
+}
+
 /* Leaflet popup custom styles */
 .leaflet-popup-content-wrapper {
   background: var(--bg-card) !important;

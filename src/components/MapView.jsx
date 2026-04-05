@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react'
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents, ZoomControl } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents, ZoomControl, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import useAlertStore, { ALERT_TYPES } from '../store/useAlertStore'
 
@@ -52,10 +52,25 @@ function MapClickHandler({ onMapClick, onRightClick }) {
 function MapFlyTo({ target }) {
   const map = useMapEvents({})
   useEffect(() => {
-    if (target) {
+    if (!target) return
+    try {
       map.flyTo([target.lat, target.lng], Math.max(map.getZoom(), 15), { animate: true, duration: 1 })
-    }
-  }, [target, map])
+    } catch (_) {}
+  }, [target]) // eslint-disable-line react-hooks/exhaustive-deps
+  return null
+}
+
+// Harita container boyutu değişince (sidebar aç/kapat, ekran döndürme) tile'ları düzelt
+function MapResizeHandler({ sidebarOpen }) {
+  const map = useMap()
+  useMapEvents({
+    resize: () => { setTimeout(() => map.invalidateSize(), 50) },
+  })
+  // Sidebar genişliği değişince de invalidate et
+  useEffect(() => {
+    const t = setTimeout(() => map.invalidateSize(), 300)
+    return () => clearTimeout(t)
+  }, [sidebarOpen, map])
   return null
 }
 
@@ -63,7 +78,7 @@ function MapFlyTo({ target }) {
 export default function MapView({
   onMapClick, onRightClick, flyTarget,
   gpsLocation, manualLocation, setManualLocation, initialCenter, isMobile,
-  onAlertDetail,
+  onAlertDetail, sidebarOpen,
 }) {
   const alerts = useAlertStore((st) => st.alerts)
 
@@ -83,9 +98,13 @@ export default function MapView({
         url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>'
         maxZoom={20}
+        keepBuffer={4}
+        updateWhenIdle={false}
+        updateWhenZooming={false}
       />
       <ZoomControl position={isMobile ? 'topright' : 'bottomright'} />
       <MapClickHandler onMapClick={onMapClick} onRightClick={onRightClick} />
+      <MapResizeHandler sidebarOpen={sidebarOpen} />
       {flyTarget && <MapFlyTo target={flyTarget} />}
 
       {/* Doğrulanmış GPS marker (<500m doğruluk) */}

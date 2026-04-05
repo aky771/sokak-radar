@@ -335,6 +335,7 @@ VITE_SUPABASE_ANON_KEY=eyJ...`}
               initialCenter={ipLocation}
               isMobile={isMobile}
               onAlertDetail={handleDetailClick}
+              sidebarOpen={sidebarOpen}
             />
 
             {/* Üst bilgi */}
