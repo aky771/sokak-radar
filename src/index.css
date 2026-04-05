@@ -30,6 +30,12 @@ html, body, #root {
   color: var(--text-primary);
 }
 
+/* Safari 100vh fix: adres çubuğu dahil sayar, dvh dinamik viewport kullanır */
+.app-root {
+  height: 100vh;   /* fallback */
+  height: 100dvh;  /* iOS 15.4+ — adres çubuğu hariç, düzgün boyutlandırma */
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: var(--bg-secondary); }

@@ -57,7 +57,9 @@ const ms = {
   }),
   handle: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '0 16px', height: '52px', flexShrink: 0, cursor: 'pointer',
+    padding: '0 16px',
+    paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+    minHeight: '52px', flexShrink: 0, cursor: 'pointer',
     position: 'relative', userSelect: 'none',
   },
   handleBar: {

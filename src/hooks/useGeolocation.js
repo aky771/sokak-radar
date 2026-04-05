@@ -1,18 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 
-/**
- * Konum stratejisi:
- *
- * 1) IP Geolocation → anında şehir merkezi, harita oraya açılır (marker YOK)
- *
- * 2) GPS — Safari için önce getCurrentPosition (user gesture ile çalışır),
- *    sonra watchPosition ile takip.
- *    - Doğruluk >= 500m → ISP/IP konumu, marker GÖSTERME
- *    - Doğruluk <  500m → gerçek GPS, marker GÖSTER
- *
- * 3) Manuel konum → kullanıcı haritaya tıklayarak seçer.
- */
-
 const GPS_ACCURACY_THRESHOLD = 500
 
 export default function useGeolocation() {
@@ -24,7 +11,7 @@ export default function useGeolocation() {
   const bestAccRef                          = useRef(Infinity)
   const watchIdRef                          = useRef(null)
 
-  // ── 1. IP Geolocation ────────────────────────────────────────
+  // ── 1. IP Geolocation ─────────────────────────────────────────
   useEffect(() => {
     const ctrl = new AbortController()
     ;(async () => {
@@ -41,15 +28,14 @@ export default function useGeolocation() {
       try {
         const res2 = await fetch('https://ipwho.is/', { signal: ctrl.signal })
         const d2 = await res2.json()
-        if (d2.success && d2.latitude) {
+        if (d2.success && d2.latitude)
           setIpLocation({ lat: +d2.latitude, lng: +d2.longitude, city: d2.city || '' })
-        }
       } catch (_) {}
     })()
     return () => ctrl.abort()
   }, [])
 
-  // ── GPS konum işleyicileri ────────────────────────────────────
+  // ── GPS helpers ────────────────────────────────────────────────
   const handlePosition = useCallback((pos) => {
     const { latitude, longitude, accuracy } = pos.coords
     setGpsAccuracy(Math.round(accuracy))
@@ -69,60 +55,60 @@ export default function useGeolocation() {
     else setGpsStatus('error')
   }, [])
 
-  // ── 2. Otomatik GPS (sayfa yüklenince) ───────────────────────
+  // ── 2. GPS — watchPosition HER ZAMAN başlar ────────────────────
+  // iOS Safari dahil tüm tarayıcılarda izin isteği bu tetikler.
+  // getCurrentPosition'a bağımlı DEĞİL; biri başarısız olsa diğeri çalışmaya devam eder.
   useEffect(() => {
     if (!navigator.geolocation) {
       setGpsStatus('error')
       return
     }
 
-    // Önce getCurrentPosition — Safari'de ilk izin isteği için güvenilir
+    // watchPosition → izin isteğini tetikler + sürekli takip
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      handlePosition,
+      handleError,
+      {
+        enableHighAccuracy: true,
+        maximumAge: 10000,   // 10s önbellek kabul et — iOS'ta ilk fix hızlanır
+        timeout: 30000,      // 30s — iç mekan GPS için yeterli süre
+      }
+    )
+
+    // getCurrentPosition → daha hızlı ilk konum (watch ile paralel çalışır)
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        handlePosition(pos)
-        // İzin alındı → watchPosition ile takibe geç
-        watchIdRef.current = navigator.geolocation.watchPosition(
-          handlePosition, handleError,
-          { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
-        )
-      },
-      (err) => {
-        handleError(err)
-        // İzin alınamadı ama yine de watch dene (bazı tarayıcılarda fark yaratır)
-        if (err.code !== 1) {
-          watchIdRef.current = navigator.geolocation.watchPosition(
-            handlePosition, handleError,
-            { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
-          )
-        }
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      handlePosition,
+      () => {},             // getCurrentPosition hatası watchPosition'ı etkilemez
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
     )
 
     return () => {
-      if (watchIdRef.current !== null) {
+      if (watchIdRef.current !== null)
         navigator.geolocation.clearWatch(watchIdRef.current)
-      }
     }
   }, [handlePosition, handleError])
 
-  // ── 3. Kullanıcı butonu ile tekrar izin iste ─────────────────
+  // ── 3. Kullanıcı butonu ile tekrar iste ────────────────────────
+  // iOS'ta Settings'den izin verince sayfayı yenilemek gerekir.
+  // Bu fonksiyon "Yenile" butonundan çağrılır.
   const requestLocation = useCallback(() => {
     if (!navigator.geolocation) return
     setGpsStatus('waiting')
     bestAccRef.current = Infinity
+
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         handlePosition(pos)
-        if (watchIdRef.current === null) {
-          watchIdRef.current = navigator.geolocation.watchPosition(
-            handlePosition, handleError,
-            { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
-          )
-        }
+        // Eski watch'ı durdur, yenisini başlat
+        if (watchIdRef.current !== null)
+          navigator.geolocation.clearWatch(watchIdRef.current)
+        watchIdRef.current = navigator.geolocation.watchPosition(
+          handlePosition, handleError,
+          { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 }
+        )
       },
       handleError,
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
     )
   }, [handlePosition, handleError])
 
@@ -136,6 +122,6 @@ export default function useGeolocation() {
     setManualLocation,
     gpsStatus,
     gpsAccuracy,
-    requestLocation,  // Safari için butonla tetikleme
+    requestLocation,
   }
 }

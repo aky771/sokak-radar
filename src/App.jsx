@@ -18,7 +18,8 @@ const blurBg = (bg) => ({
 })
 
 const s = {
-  app: { display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' },
+  // height → index.css .app-root sınıfından geliyor (100dvh Safari fix)
+  app: { display: 'flex', flexDirection: 'column', overflow: 'hidden' },
   content: { display: 'flex', flex: 1, overflow: 'hidden', position: 'relative' },
   mapWrapper: { flex: 1, position: 'relative', overflow: 'hidden' },
   fabBtn: (primary) => ({
@@ -211,7 +212,7 @@ VITE_SUPABASE_ANON_KEY=eyJ...`}
 
   return (
     <>
-      <div style={s.app}>
+      <div style={s.app} className="app-root">
         <Header
           onLoginClick={() => setAuthModalOpen(true)}
           onAdminClick={() => setShowAdmin(true)}
@@ -286,9 +287,23 @@ VITE_SUPABASE_ANON_KEY=eyJ...`}
                     Manuel seç
                   </button>
                 </div>
-                {gpsStatus === 'denied' && isMobile && (
-                  <div style={{ fontSize: '11px', color: '#fcd34d99', lineHeight: 1.5 }}>
-                    iOS: Ayarlar → Safari → Konum → İzin Ver
+                {gpsStatus === 'denied' && (
+                  <div style={{ fontSize: '11px', color: '#fcd34d99', lineHeight: 1.6, textAlign: 'center' }}>
+                    {isMobile
+                      ? 'iOS: Ayarlar → Gizlilik → Konum Servisleri → Safari → İzin Ver\nSonra sayfayı yenileyin.'
+                      : 'Tarayıcı ayarlarından konum iznini etkinleştirin.'}
+                    <br />
+                    <button
+                      onClick={() => window.location.reload()}
+                      style={{
+                        marginTop: '6px', background: '#f59e0b33', border: '1px solid #f59e0b66',
+                        color: '#fbbf24', borderRadius: '8px', padding: '4px 12px',
+                        fontSize: '11px', cursor: 'pointer', fontFamily: 'inherit',
+                        touchAction: 'manipulation',
+                      }}
+                    >
+                      🔄 Sayfayı Yenile
+                    </button>
                   </div>
                 )}
               </div>
