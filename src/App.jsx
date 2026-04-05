@@ -161,11 +161,18 @@ export default function App() {
   }
   const badge = locationBadge()
 
+  // 'waiting' dahil → iOS'ta izin dialog'u kapatılınca banner kaybolmaz
   const showManualHint = !gpsLocation && !manualLocation &&
-    (gpsStatus === 'unreliable' || gpsStatus === 'denied' || gpsStatus === 'error')
+    (gpsStatus === 'unreliable' || gpsStatus === 'denied' || gpsStatus === 'error' || gpsStatus === 'waiting')
 
-  const fabBottom = isMobile ? '72px' : '24px'
-  const badgeBottom = isMobile ? '84px' : '80px'
+  const fabBottom   = isMobile ? '72px' : '24px'
+  const badgeBottom = isMobile ? '126px' : '80px'  // FAB'ların üstünde kalsın
+
+  const btnStyle = {
+    background: '#f59e0b22', border: '1px solid #f59e0b66', color: '#fbbf24',
+    borderRadius: '8px', padding: '4px 12px', fontSize: '12px',
+    cursor: 'pointer', fontFamily: 'inherit', touchAction: 'manipulation',
+  }
 
   const hintText = manualPickMode
     ? '📌 Konumunuzu seçmek için haritaya tıklayın'
@@ -264,45 +271,33 @@ VITE_SUPABASE_ANON_KEY=eyJ...`}
                 display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px',
                 maxWidth: '92%', textAlign: 'center',
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', justifyContent: 'center' }}>
-                  ⚠️ GPS izni yok veya sinyal zayıf
-                  <button
-                    onClick={() => { requestLocation(); showToast('Konum isteniyor...') }}
-                    style={{
-                      background: '#f59e0b22', border: '1px solid #f59e0b66', color: '#fbbf24',
-                      borderRadius: '8px', padding: '3px 10px', fontSize: '12px',
-                      cursor: 'pointer', fontFamily: 'inherit', touchAction: 'manipulation',
-                    }}
-                  >
-                    📍 İzin Ver
-                  </button>
-                  <button
-                    onClick={() => setManualPickMode(true)}
-                    style={{
-                      background: 'none', border: 'none', color: '#fbbf24',
-                      textDecoration: 'underline', cursor: 'pointer', fontSize: '12px',
-                      fontFamily: 'inherit', padding: '0', touchAction: 'manipulation',
-                    }}
-                  >
-                    Manuel seç
-                  </button>
-                </div>
-                {gpsStatus === 'denied' && (
-                  <div style={{ fontSize: '11px', color: '#fcd34d99', lineHeight: 1.6, textAlign: 'center' }}>
-                    {isMobile
-                      ? 'iOS: Ayarlar → Gizlilik → Konum Servisleri → Safari → İzin Ver\nSonra sayfayı yenileyin.'
-                      : 'Tarayıcı ayarlarından konum iznini etkinleştirin.'}
-                    <br />
-                    <button
-                      onClick={() => window.location.reload()}
-                      style={{
-                        marginTop: '6px', background: '#f59e0b33', border: '1px solid #f59e0b66',
-                        color: '#fbbf24', borderRadius: '8px', padding: '4px 12px',
-                        fontSize: '11px', cursor: 'pointer', fontFamily: 'inherit',
-                        touchAction: 'manipulation',
-                      }}
-                    >
-                      🔄 Sayfayı Yenile
+                {gpsStatus === 'denied' ? (
+                  // Kalıcı red → Ayarlar yolu göster
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                    <span>🔒 Konum izni reddedildi</span>
+                    {isMobile && (
+                      <div style={{ fontSize: '11px', color: '#fcd34d99', lineHeight: 1.6, textAlign: 'center' }}>
+                        Ayarlar → Gizlilik → Konum Servisleri<br/>→ Safari → İzin Ver → Sayfayı yenile
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                      <button onClick={() => window.location.reload()} style={btnStyle}>
+                        🔄 Sayfayı Yenile
+                      </button>
+                      <button onClick={() => setManualPickMode(true)} style={btnStyle}>
+                        📌 Manuel Seç
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  // İzin bekleniyor / zayıf sinyal
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                    <span>⚠️ {gpsStatus === 'waiting' ? 'Konum bekleniyor' : 'GPS sinyali zayıf'}</span>
+                    <button onClick={requestLocation} style={btnStyle}>
+                      📍 Konum Al
+                    </button>
+                    <button onClick={() => setManualPickMode(true)} style={{ ...btnStyle, background: 'none', border: 'none', textDecoration: 'underline', padding: '3px 4px' }}>
+                      Manuel seç
                     </button>
                   </div>
                 )}
@@ -311,17 +306,21 @@ VITE_SUPABASE_ANON_KEY=eyJ...`}
 
             {/* Konum rozeti */}
             <div
-              onClick={gpsStatus === 'denied' || gpsStatus === 'error' ? () => requestLocation() : undefined}
+              onClick={(gpsStatus === 'denied' || gpsStatus === 'error') ? requestLocation : undefined}
               style={{
                 position: 'absolute', bottom: badgeBottom, left: '16px', zIndex: 800,
-                display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px',
+                display: 'inline-flex', alignItems: 'center', gap: '5px',
+                padding: '5px 10px', maxWidth: 'calc(50vw - 20px)',
                 ...blurBg('#1e2130ee'), border: '1px solid #2d3148',
                 borderRadius: '20px', fontSize: '11px', color: '#94a3b8',
                 cursor: (gpsStatus === 'denied' || gpsStatus === 'error') ? 'pointer' : 'default',
+                overflow: 'hidden',
               }}
             >
               <div style={{ width: '7px', height: '7px', borderRadius: '50%', flexShrink: 0, background: badge.dot }} />
-              {badge.text}
+              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {badge.text}
+              </span>
             </div>
 
             {/* FABs */}

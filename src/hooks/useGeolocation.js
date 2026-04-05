@@ -97,8 +97,9 @@ export default function useGeolocation() {
   // ── 3. Kullanıcı "İzin Ver" butonuyla tetikler ─────────────────
   const requestLocation = useCallback(() => {
     if (!navigator.geolocation) return
-    setGpsStatus('waiting')
-    bestAccRef.current = Infinity
+    // NOT: setGpsStatus('waiting') ÇAĞIRMIYORUZ
+    // → banner gizlenmez, kullanıcı tekrar deneyebilir
+    bestAccRef.current = gpsLocation ? gpsLocation.accuracy : Infinity
 
     // Önce low accuracy (hızlı, cell/WiFi — iOS'ta saniyeler içinde döner)
     navigator.geolocation.getCurrentPosition(
@@ -128,7 +129,7 @@ export default function useGeolocation() {
       },
       { enableHighAccuracy: false, maximumAge: 30000, timeout: 10000 }
     )
-  }, [handlePosition, handleError])
+  }, [handlePosition, handleError, gpsLocation])
 
   const location = manualLocation || gpsLocation || null
 

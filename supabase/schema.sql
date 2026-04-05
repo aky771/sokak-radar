@@ -34,16 +34,32 @@ CREATE POLICY "Kullanıcı kendi profilini güncelleyebilir" ON profiles
 CREATE POLICY "Admin tüm profilleri güncelleyebilir" ON profiles
   FOR UPDATE USING (is_admin());
 
+-- Profiles INSERT policy (client-side upsert için gerekli)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'profiles' AND policyname = 'Kullanıcı kendi profilini oluşturabilir'
+  ) THEN
+    EXECUTE 'CREATE POLICY "Kullanıcı kendi profilini oluşturabilir" ON profiles FOR INSERT WITH CHECK (auth.uid() = id)';
+  END IF;
+END $$;
+
 -- Kayıt olunca otomatik profil oluştur
+-- EXCEPTION bloğu: profil oluşturma hatası kaydı engellemez
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO profiles (id, email, username)
-  VALUES (
-    NEW.id,
-    NEW.email,
-    COALESCE(NEW.raw_user_meta_data->>'username', SPLIT_PART(NEW.email, '@', 1))
-  );
+  BEGIN
+    INSERT INTO profiles (id, email, username)
+    VALUES (
+      NEW.id,
+      NEW.email,
+      COALESCE(NEW.raw_user_meta_data->>'username', SPLIT_PART(NEW.email, '@', 1))
+    )
+    ON CONFLICT (id) DO NOTHING;
+  EXCEPTION WHEN OTHERS THEN
+    NULL; -- Hata olsa bile kayıt tamamlanır
+  END;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
