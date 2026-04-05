@@ -27,7 +27,7 @@ const useAuthStore = create((set, get) => ({
       .from('profiles')
       .select('*')
       .eq('id', userId)
-      .single()
+      .maybeSingle()
     set({ profile: data })
   },
 
@@ -55,20 +55,27 @@ const useAuthStore = create((set, get) => ({
     set({ user: null, profile: null })
   },
 
-  isAdmin: () => get().user?.email === ADMIN_EMAIL,
+  isAdmin: () => {
+    const email = get().user?.email?.trim().toLowerCase()
+    return !!email && email === ADMIN_EMAIL.trim().toLowerCase()
+  },
 
   updateProfile: async (updates) => {
-    const userId = get().user?.id
+    const userId    = get().user?.id
+    const userEmail = get().user?.email
     if (!userId) return { error: new Error('Giriş yapılmamış') }
+
+    // UPDATE yerine UPSERT — profil satırı yoksa oluşturur
     const { error } = await supabase
       .from('profiles')
-      .update({
-        username:     updates.username     ?? undefined,
+      .upsert({
+        id:           userId,
+        email:        userEmail ?? null,
+        username:     updates.username     ?? get().profile?.username ?? userEmail?.split('@')[0] ?? 'kullanici',
         display_name: updates.display_name ?? null,
         bio:          updates.bio          ?? null,
-        avatar_color: updates.avatar_color ?? undefined,
-      })
-      .eq('id', userId)
+        avatar_color: updates.avatar_color ?? get().profile?.avatar_color ?? '#6366f1',
+      }, { onConflict: 'id' })
     if (!error) await get().fetchProfile(userId)
     return { error }
   },

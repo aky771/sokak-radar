@@ -39,6 +39,7 @@ export default function UserProfileModal({ userId, username: fallbackUsername, o
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState(null)
   const [editForm, setEditForm] = useState({})
 
   useEffect(() => {
@@ -86,9 +87,14 @@ export default function UserProfileModal({ userId, username: fallbackUsername, o
 
   const handleSave = async () => {
     setSaving(true)
+    setSaveError(null)
     const { error } = await updateProfile(editForm)
     setSaving(false)
-    if (!error) setEditing(false)
+    if (!error) {
+      setEditing(false)
+    } else {
+      setSaveError(error.message || 'Kaydetme başarısız, tekrar deneyin.')
+    }
   }
 
   const overlay = {
@@ -276,6 +282,16 @@ export default function UserProfileModal({ userId, username: fallbackUsername, o
             {/* Butonlar */}
             {isOwn && (
               editing ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {saveError && (
+                  <div style={{
+                    background: '#7f1d1d33', border: '1px solid #ef444466',
+                    borderRadius: 8, padding: '8px 12px',
+                    fontSize: 12, color: '#fca5a5',
+                  }}>
+                    ❌ {saveError}
+                  </div>
+                )}
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button onClick={() => setEditing(false)} style={{
                     flex: 1, padding: '11px', borderRadius: 10,
@@ -290,6 +306,7 @@ export default function UserProfileModal({ userId, username: fallbackUsername, o
                   }}>
                     {saving ? 'Kaydediliyor...' : '✓ Kaydet'}
                   </button>
+                </div>
                 </div>
               ) : (
                 <button onClick={() => setEditing(true)} style={{
