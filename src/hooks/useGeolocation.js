@@ -2,11 +2,10 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 
 const GPS_ACCURACY_THRESHOLD = 500
 
-// watchPosition için seçenekler
 const WATCH_OPTS = {
   enableHighAccuracy: true,
-  maximumAge: 30000,  // 30s önbellek → iOS'ta ilk fix hızlanır
-  timeout: 60000,     // 60s → iç mekânda GPS için yeterli süre
+  maximumAge: 30000,
+  timeout: 60000,
 }
 
 export default function useGeolocation() {
@@ -15,8 +14,11 @@ export default function useGeolocation() {
   const [manualLocation, setManualLocation] = useState(null)
   const [gpsStatus, setGpsStatus]           = useState('waiting')
   const [gpsAccuracy, setGpsAccuracy]       = useState(null)
-  const bestAccRef                          = useRef(Infinity)
-  const watchIdRef                          = useRef(null)
+  const [permissionState, setPermissionState] = useState('prompt') // 'prompt' | 'granted' | 'denied'
+
+  const bestAccRef   = useRef(Infinity)
+  const watchIdRef   = useRef(null)
+  const permRef      = useRef(null)
 
   // ── 1. IP Geolocation ─────────────────────────────────────────
   useEffect(() => {
@@ -42,7 +44,7 @@ export default function useGeolocation() {
     return () => ctrl.abort()
   }, [])
 
-  // ── GPS yardımcıları ───────────────────────────────────────────
+  // ── GPS helpers ────────────────────────────────────────────────
   const handlePosition = useCallback((pos) => {
     const { latitude, longitude, accuracy } = pos.coords
     setGpsAccuracy(Math.round(accuracy))
@@ -58,78 +60,104 @@ export default function useGeolocation() {
   }, [])
 
   const handleError = useCallback((err) => {
-    // TIMEOUT (code 3) → watchPosition devam ediyor, 'error' verme
     if (err.code === 1) setGpsStatus('denied')
     else if (err.code !== 3) setGpsStatus('error')
-    // code 3 = timeout, bir sonraki denemede düzelir — mevcut status korunur
   }, [])
 
-  // ── 2. Otomatik GPS ────────────────────────────────────────────
-  useEffect(() => {
+  // ── GPS alma fonksiyonu (hem mount hem buton kullanır) ─────────
+  const startLocation = useCallback(() => {
     if (!navigator.geolocation) { setGpsStatus('error'); return }
 
-    // watchPosition HER ZAMAN başlar — getCurrentPosition'a bağlı değil
-    watchIdRef.current = navigator.geolocation.watchPosition(
-      handlePosition, handleError, WATCH_OPTS
-    )
-
-    // Hızlı ilk konum için low-accuracy getCurrentPosition (cell/WiFi tabanlı)
-    // iOS Safari'de izin istemi için user gesture olmasa da çalışır
+    // Low accuracy → hızlı cell/WiFi fix
     navigator.geolocation.getCurrentPosition(
       handlePosition,
       () => {
         // Low accuracy başarısız → high accuracy dene
         navigator.geolocation.getCurrentPosition(
           handlePosition,
-          () => {}, // sessizce başarısız ol, watch devam ediyor
+          () => {},
           { enableHighAccuracy: true, maximumAge: 30000, timeout: 20000 }
         )
       },
       { enableHighAccuracy: false, maximumAge: 30000, timeout: 8000 }
     )
 
+    // watchPosition daima çalışır
+    if (watchIdRef.current !== null)
+      navigator.geolocation.clearWatch(watchIdRef.current)
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      handlePosition, handleError, WATCH_OPTS
+    )
+  }, [handlePosition, handleError])
+
+  // ── 2. Sayfa yüklenince GPS başlat ────────────────────────────
+  useEffect(() => {
+    startLocation()
     return () => {
       if (watchIdRef.current !== null)
         navigator.geolocation.clearWatch(watchIdRef.current)
     }
-  }, [handlePosition, handleError])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── 3. Kullanıcı "İzin Ver" butonuyla tetikler ─────────────────
+  // ── 3. navigator.permissions izleme ──────────────────────────
+  // • 'granted'  → otomatik konum al
+  // • 'denied'   → Settings yönlendirmesi göster
+  // • 'prompt'   → tekrar dialog açılabilir
+  useEffect(() => {
+    if (!navigator.permissions) return
+
+    navigator.permissions.query({ name: 'geolocation' }).then((result) => {
+      permRef.current = result
+      setPermissionState(result.state)
+
+      result.onchange = () => {
+        const state = result.state
+        setPermissionState(state)
+
+        if (state === 'granted') {
+          // Kullanıcı Settings'den izin verdi → otomatik başlat
+          bestAccRef.current = Infinity
+          startLocation()
+        }
+      }
+    }).catch(() => {})
+
+    return () => {
+      if (permRef.current) permRef.current.onchange = null
+    }
+  }, [startLocation])
+
+  // ── 4. "Konum Al" butonu ──────────────────────────────────────
   const requestLocation = useCallback(() => {
     if (!navigator.geolocation) return
-    // NOT: setGpsStatus('waiting') ÇAĞIRMIYORUZ
-    // → banner gizlenmez, kullanıcı tekrar deneyebilir
-    bestAccRef.current = gpsLocation ? gpsLocation.accuracy : Infinity
 
-    // Önce low accuracy (hızlı, cell/WiFi — iOS'ta saniyeler içinde döner)
+    // Permissions API varsa durumu kontrol et
+    if (navigator.permissions && permissionState === 'denied') {
+      // Gerçekten kalıcı red → yalnızca Settings yönlendirmesi çalışır
+      return
+    }
+
+    // 'prompt' veya 'granted' → getCurrentPosition çağrısı dialog açar
+    bestAccRef.current = Infinity
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         handlePosition(pos)
-        // Başarılı → high accuracy watch'ı yeniden başlat
         if (watchIdRef.current !== null)
           navigator.geolocation.clearWatch(watchIdRef.current)
         watchIdRef.current = navigator.geolocation.watchPosition(
           handlePosition, handleError, WATCH_OPTS
         )
       },
-      () => {
-        // Low accuracy başarısız → high accuracy dene (izin yoksa reddedilir)
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            handlePosition(pos)
-            if (watchIdRef.current !== null)
-              navigator.geolocation.clearWatch(watchIdRef.current)
-            watchIdRef.current = navigator.geolocation.watchPosition(
-              handlePosition, handleError, WATCH_OPTS
-            )
-          },
-          handleError,
-          { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 }
-        )
+      (err) => {
+        if (err.code === 1) {
+          // Permissions API yoksa (eski iOS) — status'u denied yap
+          if (!navigator.permissions) setGpsStatus('denied')
+          // Permissions API varsa onchange zaten tetiklenir
+        }
       },
-      { enableHighAccuracy: false, maximumAge: 30000, timeout: 10000 }
+      { enableHighAccuracy: false, maximumAge: 0, timeout: 15000 }
     )
-  }, [handlePosition, handleError, gpsLocation])
+  }, [handlePosition, handleError, permissionState])
 
   const location = manualLocation || gpsLocation || null
 
@@ -141,6 +169,7 @@ export default function useGeolocation() {
     setManualLocation,
     gpsStatus,
     gpsAccuracy,
+    permissionState,  // 'prompt' | 'granted' | 'denied'
     requestLocation,
   }
 }

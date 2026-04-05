@@ -46,7 +46,7 @@ export default function App() {
   const { user, profile, init: initAuth, loading: authLoading, isAdmin } = useAuthStore()
   const {
     location, ipLocation, gpsLocation, manualLocation,
-    setManualLocation, gpsStatus, gpsAccuracy, requestLocation,
+    setManualLocation, gpsStatus, gpsAccuracy, permissionState, requestLocation,
   } = useGeolocation()
 
   const isMobile = useIsMobile()
@@ -161,9 +161,10 @@ export default function App() {
   }
   const badge = locationBadge()
 
-  // 'waiting' dahil → iOS'ta izin dialog'u kapatılınca banner kaybolmaz
+  // Gerçek kalıcı red: Permissions API 'denied' dediyse VEYA GPS kodu 1 aldıysa
+  const trulyDenied = permissionState === 'denied' || gpsStatus === 'denied'
   const showManualHint = !gpsLocation && !manualLocation &&
-    (gpsStatus === 'unreliable' || gpsStatus === 'denied' || gpsStatus === 'error' || gpsStatus === 'waiting')
+    (trulyDenied || gpsStatus === 'unreliable' || gpsStatus === 'error' || gpsStatus === 'waiting')
 
   const fabBottom   = isMobile ? '72px' : '24px'
   const badgeBottom = isMobile ? '126px' : '80px'  // FAB'ların üstünde kalsın
@@ -271,32 +272,32 @@ VITE_SUPABASE_ANON_KEY=eyJ...`}
                 display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px',
                 maxWidth: '92%', textAlign: 'center',
               }}>
-                {gpsStatus === 'denied' ? (
-                  // Kalıcı red → Ayarlar yolu göster
+                {trulyDenied ? (
+                  // Kalıcı red → Ayarlar yolu (otomatik algılama çalışıyorsa sayfa yenilemeden açılır)
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
                     <span>🔒 Konum izni reddedildi</span>
                     {isMobile && (
                       <div style={{ fontSize: '11px', color: '#fcd34d99', lineHeight: 1.6, textAlign: 'center' }}>
-                        Ayarlar → Gizlilik → Konum Servisleri<br/>→ Safari → İzin Ver → Sayfayı yenile
+                        Ayarlar → Gizlilik → Konum Servisleri<br />
+                        → Safari → İzin Ver<br />
+                        <em style={{ fontSize: '10px' }}>Geri dönünce otomatik algılanır</em>
                       </div>
                     )}
-                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
-                      <button onClick={() => window.location.reload()} style={btnStyle}>
-                        🔄 Sayfayı Yenile
-                      </button>
-                      <button onClick={() => setManualPickMode(true)} style={btnStyle}>
-                        📌 Manuel Seç
-                      </button>
-                    </div>
+                    <button onClick={() => setManualPickMode(true)} style={btnStyle}>
+                      📌 Manuel Konum Seç
+                    </button>
                   </div>
                 ) : (
-                  // İzin bekleniyor / zayıf sinyal
+                  // Dismissed veya bekleniyor → tekrar dialog açılabilir
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
-                    <span>⚠️ {gpsStatus === 'waiting' ? 'Konum bekleniyor' : 'GPS sinyali zayıf'}</span>
+                    <span>⚠️ {gpsStatus === 'waiting' ? 'Konum izni bekleniyor' : 'GPS sinyali zayıf'}</span>
                     <button onClick={requestLocation} style={btnStyle}>
-                      📍 Konum Al
+                      📍 Tekrar İzin İste
                     </button>
-                    <button onClick={() => setManualPickMode(true)} style={{ ...btnStyle, background: 'none', border: 'none', textDecoration: 'underline', padding: '3px 4px' }}>
+                    <button
+                      onClick={() => setManualPickMode(true)}
+                      style={{ ...btnStyle, background: 'none', border: 'none', textDecoration: 'underline', padding: '3px 4px' }}
+                    >
                       Manuel seç
                     </button>
                   </div>
