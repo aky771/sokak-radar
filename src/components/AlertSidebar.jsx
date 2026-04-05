@@ -213,24 +213,47 @@ const ds = {
   },
 }
 
+const HANDLE_H = 52   // sabit handle yüksekliği (px)
+const HEAD_H   = 68   // sabit filtre başlığı yüksekliği (px)
+
 // ---- Mobile styles ----
 const ms = {
   sheet: (open) => ({
     position: 'fixed', bottom: 0, left: 0, right: 0,
-    height: open ? '65dvh' : 'var(--sheet-closed-h)',
+    height: open ? '72dvh' : 'var(--sheet-closed-h)',
     background: '#1a1d27',
     borderTop: '1px solid #2d3148',
     borderRadius: '16px 16px 0 0',
-    display: 'flex', flexDirection: 'column',
     transition: 'height 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-    zIndex: 700, overflow: 'hidden',
-    WebkitOverflowScrolling: 'touch',
+    zIndex: 700,
+    // overflow: hidden SADECE border-radius clip için — scroll list ayrı absolute
+    overflow: 'hidden',
   }),
   handle: {
+    position: 'absolute', top: 0, left: 0, right: 0,
+    height: HANDLE_H,
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    paddingTop: 0, paddingLeft: 16, paddingRight: 16, paddingBottom: 0,
-    minHeight: 52, flexShrink: 0, cursor: 'pointer',
-    position: 'relative', userSelect: 'none',
+    paddingLeft: 16, paddingRight: 16,
+    cursor: 'pointer', userSelect: 'none', zIndex: 2,
+    background: '#1a1d27',
+  },
+  head: {
+    position: 'absolute', top: HANDLE_H, left: 0, right: 0,
+    height: HEAD_H,
+    padding: '8px 12px',
+    borderBottom: '1px solid #2d3148',
+    borderTop: '1px solid #2d3148',
+    background: '#1a1d27', zIndex: 2,
+  },
+  list: {
+    position: 'absolute',
+    top: HANDLE_H + HEAD_H,
+    bottom: 0, left: 0, right: 0,
+    overflowY: 'scroll',
+    WebkitOverflowScrolling: 'touch',
+    overscrollBehavior: 'contain',
+    padding: '8px 10px',
+    display: 'flex', flexDirection: 'column', gap: '6px',
   },
 }
 
@@ -268,49 +291,11 @@ export default function AlertSidebar({ onAlertClick, onDetailClick, onUserClick,
     })
   }, [alerts, filter, userLocation])
 
-  const alertListContent = (
-    <>
-      <div style={sh.head}>
-        <div style={sh.headTitle}>
-          Uyarılar ({sorted.length})
-          {userLocation && <span style={{ fontSize: 10, color: '#6366f188', fontWeight: 400, marginLeft: 6 }}>• yakına göre sıralı</span>}
-        </div>
-        <div style={sh.filterRow}>
-          <button style={sh.filterBtn(filter === 'all')} onClick={() => setFilter('all')}>Tümü</button>
-          {Object.entries(ALERT_TYPES).map(([key, info]) => (
-            <button key={key} style={sh.filterBtn(filter === key)} onClick={() => setFilter(key)}>
-              {info.emoji}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div style={sh.list}>
-        {sorted.length === 0 && (
-          <div style={sh.empty}>
-            <div style={{ fontSize: '28px', marginBottom: '8px' }}>🗺️</div>
-            Henüz uyarı yok.
-            <br /><span style={{ fontSize: '11px' }}>Haritaya tıklayarak ekleyin.</span>
-          </div>
-        )}
-        {sorted.map((alert) => (
-          <AlertCard
-            key={alert.id}
-            alert={alert}
-            onMapClick={onAlertClick}
-            onDetailClick={onDetailClick}
-            onUserClick={onUserClick}
-            userLocation={userLocation}
-          />
-        ))}
-      </div>
-    </>
-  )
-
   if (isMobile) {
     return (
       <div style={ms.sheet(open)}>
-        {/* Sürükleme çubuğu + başlık */}
+
+        {/* Handle — her zaman görünür, tıklanabilir */}
         <div style={ms.handle} onClick={() => setOpen(!open)}>
           <div style={{
             position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)',
@@ -325,20 +310,91 @@ export default function AlertSidebar({ onAlertClick, onDetailClick, onUserClick,
             transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
           }}>⌃</span>
         </div>
-        {/* İçerik — minHeight:0 ile flex shrink çalışır, liste scroll'lanabilir */}
-        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          {alertListContent}
-        </div>
+
+        {/* Filtre başlığı — absolute, sabit yükseklik */}
+        {open && (
+          <div style={ms.head}>
+            <div style={{ fontSize: '12px', fontWeight: 700, color: '#f1f5f9', marginBottom: 6 }}>
+              {sorted.length} uyarı
+              {userLocation && <span style={{ fontSize: 10, color: '#6366f166', fontWeight: 400, marginLeft: 6 }}>• yakına göre</span>}
+            </div>
+            <div style={{ display: 'flex', gap: '4px', flexWrap: 'nowrap', overflowX: 'auto' }}>
+              <button style={sh.filterBtn(filter === 'all')} onClick={() => setFilter('all')}>Tümü</button>
+              {Object.entries(ALERT_TYPES).map(([key, info]) => (
+                <button key={key} style={sh.filterBtn(filter === key)} onClick={() => setFilter(key)}>
+                  {info.emoji}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Kart listesi — absolute, top = handle + head, scroll */}
+        {open && (
+          <div style={ms.list}>
+            {sorted.length === 0 && (
+              <div style={sh.empty}>
+                <div style={{ fontSize: '28px', marginBottom: '8px' }}>🗺️</div>
+                Henüz uyarı yok.<br />
+                <span style={{ fontSize: '11px' }}>Haritaya tıklayarak ekleyin.</span>
+              </div>
+            )}
+            {sorted.map((alert) => (
+              <AlertCard
+                key={alert.id}
+                alert={alert}
+                onMapClick={onAlertClick}
+                onDetailClick={onDetailClick}
+                onUserClick={onUserClick}
+                userLocation={userLocation}
+              />
+            ))}
+          </div>
+        )}
+
       </div>
     )
   }
 
+  // Desktop
   return (
     <div style={ds.sidebar(open)}>
       <button style={ds.toggle} onClick={() => setOpen(!open)}>
         {open ? '›' : '‹'}
       </button>
-      {alertListContent}
+      <div style={sh.head}>
+        <div style={sh.headTitle}>
+          Uyarılar ({sorted.length})
+          {userLocation && <span style={{ fontSize: 10, color: '#6366f188', fontWeight: 400, marginLeft: 6 }}>• yakına göre</span>}
+        </div>
+        <div style={sh.filterRow}>
+          <button style={sh.filterBtn(filter === 'all')} onClick={() => setFilter('all')}>Tümü</button>
+          {Object.entries(ALERT_TYPES).map(([key, info]) => (
+            <button key={key} style={sh.filterBtn(filter === key)} onClick={() => setFilter(key)}>
+              {info.emoji}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div style={sh.list}>
+        {sorted.length === 0 && (
+          <div style={sh.empty}>
+            <div style={{ fontSize: '28px', marginBottom: '8px' }}>🗺️</div>
+            Henüz uyarı yok.<br />
+            <span style={{ fontSize: '11px' }}>Haritaya tıklayarak ekleyin.</span>
+          </div>
+        )}
+        {sorted.map((alert) => (
+          <AlertCard
+            key={alert.id}
+            alert={alert}
+            onMapClick={onAlertClick}
+            onDetailClick={onDetailClick}
+            onUserClick={onUserClick}
+            userLocation={userLocation}
+          />
+        ))}
+      </div>
     </div>
   )
 }

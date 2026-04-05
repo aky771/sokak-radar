@@ -334,6 +334,7 @@ VITE_SUPABASE_ANON_KEY=eyJ...`}
               setManualLocation={setManualLocation}
               initialCenter={ipLocation}
               isMobile={isMobile}
+              onAlertDetail={handleDetailClick}
             />
 
             {/* Üst bilgi */}

@@ -1,7 +1,8 @@
 import React, { useEffect } from 'react'
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents, ZoomControl } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, useMapEvents, ZoomControl } from 'react-leaflet'
 import L from 'leaflet'
 import useAlertStore, { ALERT_TYPES } from '../store/useAlertStore'
+
 
 delete L.Icon.Default.prototype._getIconUrl
 L.Icon.Default.mergeOptions({
@@ -39,14 +40,6 @@ const manualIcon = L.divIcon({
   iconSize: [28, 28], iconAnchor: [14, 14],
 })
 
-function timeAgo(iso) {
-  if (!iso) return ''
-  const d = (Date.now() - new Date(iso)) / 1000
-  if (d < 60) return 'Az önce'
-  if (d < 3600) return `${Math.floor(d / 60)} dk önce`
-  if (d < 86400) return `${Math.floor(d / 3600)} sa önce`
-  return `${Math.floor(d / 86400)} gün önce`
-}
 
 function MapClickHandler({ onMapClick, onRightClick }) {
   useMapEvents({
@@ -66,77 +59,13 @@ function MapFlyTo({ target }) {
   return null
 }
 
-function AlertPopupContent({ alert, info, onVote }) {
-  const expiresIn = Math.max(0, Math.floor((new Date(alert.expires_at) - Date.now()) / 3600000))
-  return (
-    <div style={{ fontFamily: "'Segoe UI', system-ui, sans-serif", minWidth: '220px', maxWidth: '280px' }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: '8px',
-        padding: '12px 14px 10px',
-        borderBottom: (alert.photo_url || alert.description) ? '1px solid #2d3148' : 'none',
-      }}>
-        <span style={{
-          display: 'inline-flex', alignItems: 'center', gap: '5px',
-          padding: '3px 10px', borderRadius: '6px', background: info.bg,
-          color: info.color, fontSize: '12px', fontWeight: 700,
-        }}>
-          {info.emoji} {info.label}
-        </span>
-        <span style={{ fontSize: '11px', color: '#64748b', marginLeft: 'auto' }}>
-          {timeAgo(alert.created_at)}
-        </span>
-      </div>
-
-      {alert.photo_url && (
-        <img src={alert.photo_url} alt="uyarı"
-          style={{ width: '100%', maxHeight: '140px', objectFit: 'cover', display: 'block' }} />
-      )}
-
-      {alert.description && (
-        <p style={{
-          margin: 0, padding: '10px 14px',
-          fontSize: '13px', color: '#cbd5e1', lineHeight: 1.55,
-          borderBottom: '1px solid #2d3148',
-        }}>
-          {alert.description}
-        </p>
-      )}
-
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '8px 14px', gap: '8px',
-      }}>
-        <div>
-          {alert.username && (
-            <div style={{ fontSize: '11px', color: '#475569', marginBottom: '2px' }}>
-              👤 {alert.username}
-            </div>
-          )}
-          <div style={{ fontSize: '10px', color: '#334155', fontFamily: 'monospace' }}>
-            {alert.lat?.toFixed(4)}, {alert.lng?.toFixed(4)}
-          </div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ fontSize: '10px', color: '#475569' }}>⏱ {expiresIn}s</span>
-          <button onClick={onVote} style={{
-            background: '#252836', border: '1px solid #2d3148', borderRadius: '6px',
-            padding: '4px 10px', fontSize: '12px', color: '#94a3b8',
-            cursor: 'pointer', fontFamily: 'inherit',
-          }}>
-            👍 {alert.votes}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 export default function MapView({
   onMapClick, onRightClick, flyTarget,
   gpsLocation, manualLocation, setManualLocation, initialCenter, isMobile,
+  onAlertDetail,
 }) {
-  const alerts    = useAlertStore((st) => st.alerts)
-  const voteAlert = useAlertStore((st) => st.voteAlert)
+  const alerts = useAlertStore((st) => st.alerts)
 
   const defaultCenter = initialCenter
     ? [initialCenter.lat, initialCenter.lng]
@@ -221,15 +150,21 @@ export default function MapView({
         </Marker>
       )}
 
-      {/* Uyarı markerları */}
+      {/* Uyarı markerları — tıklanınca detay modalı açılır, map click tetiklenmez */}
       {alerts.map((alert) => {
         const info = ALERT_TYPES[alert.type] || ALERT_TYPES.spotted
         return (
-          <Marker key={alert.id} position={[alert.lat, alert.lng]} icon={makeAlertIcon(info)}>
-            <Popup maxWidth={300}>
-              <AlertPopupContent alert={alert} info={info} onVote={() => voteAlert(alert.id)} />
-            </Popup>
-          </Marker>
+          <Marker
+            key={alert.id}
+            position={[alert.lat, alert.lng]}
+            icon={makeAlertIcon(info)}
+            eventHandlers={{
+              click: (e) => {
+                L.DomEvent.stopPropagation(e)
+                onAlertDetail && onAlertDetail(alert)
+              },
+            }}
+          />
         )
       })}
     </MapContainer>
