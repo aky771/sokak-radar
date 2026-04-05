@@ -9,8 +9,12 @@ export default function Header({ onLoginClick, onAdminClick, isMobile }) {
   const s = {
     header: {
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: isMobile ? '0 12px' : '0 20px',
-      height: isMobile ? '52px' : '58px',
+      paddingTop: 'env(safe-area-inset-top, 0px)',
+      paddingLeft: isMobile ? '12px' : '20px',
+      paddingRight: isMobile ? '12px' : '20px',
+      paddingBottom: 0,
+      minHeight: isMobile ? '52px' : '58px',
+      height: isMobile ? 'calc(52px + env(safe-area-inset-top, 0px))' : '58px',
       background: '#0f1117', borderBottom: '1px solid #2d3148',
       zIndex: 1000, flexShrink: 0,
     },

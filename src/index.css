@@ -36,6 +36,14 @@ html, body, #root {
   height: 100dvh;  /* iOS 15.4+ — adres çubuğu hariç, düzgün boyutlandırma */
 }
 
+/* iOS Safe Area — viewport-fit=cover ile çentik/home bar desteği */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: var(--bg-secondary); }

@@ -23,11 +23,13 @@ const s = {
   content: { display: 'flex', flex: 1, overflow: 'hidden', position: 'relative' },
   mapWrapper: { flex: 1, position: 'relative', overflow: 'hidden' },
   fabBtn: (primary) => ({
-    display: 'flex', alignItems: 'center', gap: '8px', padding: '11px 20px', borderRadius: '30px',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    gap: '6px', padding: '0 18px', borderRadius: '30px',
+    height: '44px', minHeight: '44px',
     border: primary ? 'none' : '1px solid #2d3148', cursor: 'pointer', whiteSpace: 'nowrap',
     ...blurBg(primary ? '#6366f1' : '#1e2130ee'),
     color: primary ? 'white' : '#94a3b8', fontSize: '13px', fontWeight: 600,
-    boxShadow: '0 4px 20px rgba(0,0,0,0.35)', transition: 'all 0.15s',
+    lineHeight: '1', boxShadow: '0 4px 20px rgba(0,0,0,0.35)', transition: 'all 0.15s',
     touchAction: 'manipulation',
   }),
   setupBanner: {
@@ -166,8 +168,8 @@ export default function App() {
   const showManualHint = !gpsLocation && !manualLocation &&
     (trulyDenied || gpsStatus === 'unreliable' || gpsStatus === 'error' || gpsStatus === 'waiting')
 
-  const fabBottom   = isMobile ? '72px' : '24px'
-  const badgeBottom = isMobile ? '126px' : '80px'  // FAB'ların üstünde kalsın
+  const fabBottom   = isMobile ? 'calc(72px + env(safe-area-inset-bottom, 0px))' : '24px'
+  const badgeBottom = isMobile ? 'calc(126px + env(safe-area-inset-bottom, 0px))' : '80px'
 
   const btnStyle = {
     background: '#f59e0b22', border: '1px solid #f59e0b66', color: '#fbbf24',
@@ -273,14 +275,40 @@ VITE_SUPABASE_ANON_KEY=eyJ...`}
                 maxWidth: '92%', textAlign: 'center',
               }}>
                 {trulyDenied ? (
-                  // Kalıcı red → Ayarlar yolu (otomatik algılama çalışıyorsa sayfa yenilemeden açılır)
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                    <span>🔒 Konum izni reddedildi</span>
+                  // Kalıcı red → Adım adım Safari ayarları rehberi
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', width: '100%' }}>
+                    <span style={{ fontWeight: 700, fontSize: '13px' }}>🔒 Konum izni reddedildi</span>
                     {isMobile && (
-                      <div style={{ fontSize: '11px', color: '#fcd34d99', lineHeight: 1.6, textAlign: 'center' }}>
-                        Ayarlar → Gizlilik → Konum Servisleri<br />
-                        → Safari → İzin Ver<br />
-                        <em style={{ fontSize: '10px' }}>Geri dönünce otomatik algılanır</em>
+                      <div style={{
+                        background: 'rgba(0,0,0,0.35)', borderRadius: '10px', padding: '10px 12px',
+                        width: '100%', textAlign: 'left',
+                      }}>
+                        <div style={{ fontSize: '11px', fontWeight: 700, color: '#fbbf24', marginBottom: '8px' }}>
+                          Safari için konum izni nasıl açılır:
+                        </div>
+                        {[
+                          ['1', 'Ayarlar', 'iPhone Ana Ekranından açın'],
+                          ['2', 'Gizlilik ve Güvenlik', 'Aşağı kaydırın'],
+                          ['3', 'Konum Servisleri', 'Açık olduğunu kontrol edin'],
+                          ['4', 'Safari Siteleri', 'Listede bulun'],
+                          ['5', 'İzin Ver (Kullanırken)', 'Seçeneği işaretleyin'],
+                        ].map(([num, title, sub]) => (
+                          <div key={num} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '6px' }}>
+                            <div style={{
+                              width: '20px', height: '20px', borderRadius: '50%',
+                              background: '#f59e0b33', border: '1px solid #f59e0b66',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              fontSize: '10px', fontWeight: 700, color: '#fbbf24', flexShrink: 0,
+                            }}>{num}</div>
+                            <div>
+                              <div style={{ fontSize: '11px', fontWeight: 600, color: '#fcd34d' }}>{title}</div>
+                              <div style={{ fontSize: '10px', color: '#fcd34d88' }}>{sub}</div>
+                            </div>
+                          </div>
+                        ))}
+                        <div style={{ fontSize: '10px', color: '#fcd34d77', marginTop: '4px', fontStyle: 'italic' }}>
+                          Ayarlardan döndüğünüzde konum otomatik algılanır.
+                        </div>
                       </div>
                     )}
                     <button onClick={() => setManualPickMode(true)} style={btnStyle}>
@@ -355,7 +383,8 @@ VITE_SUPABASE_ANON_KEY=eyJ...`}
                 onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.9')}
                 onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
               >
-                ＋ {isMobile ? 'Uyarı' : 'Uyarı Yayınla'}
+                <span style={{ fontSize: '17px', lineHeight: 1 }}>+</span>
+                {isMobile ? 'Uyarı' : 'Uyarı Yayınla'}
               </button>
             </div>
           </div>

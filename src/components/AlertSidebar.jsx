@@ -45,20 +45,19 @@ const ms = {
   sheet: (open) => ({
     position: 'fixed', bottom: 0, left: 0, right: 0,
     // dvh: Safari adres çubuğunu hariç tutar — overflow sorununu önler
-    height: open ? '65dvh' : '52px',
+    height: open ? '65dvh' : 'calc(52px + env(safe-area-inset-bottom, 0px))',
     background: '#1a1d27',
     borderTop: '1px solid #2d3148',
     borderRadius: '16px 16px 0 0',
     display: 'flex', flexDirection: 'column',
     transition: 'height 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
     zIndex: 700, overflow: 'hidden',
-    // Safari'de position:fixed düzgün çalışması için
     WebkitOverflowScrolling: 'touch',
   }),
   handle: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '0 16px',
-    paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+    paddingTop: '0', paddingLeft: '16px', paddingRight: '16px',
+    paddingBottom: '0',
     minHeight: '52px', flexShrink: 0, cursor: 'pointer',
     position: 'relative', userSelect: 'none',
   },
@@ -66,7 +65,7 @@ const ms = {
     position: 'absolute', top: '8px', left: '50%', transform: 'translateX(-50%)',
     width: '36px', height: '4px', borderRadius: '2px', background: '#3d4460',
   },
-  handleTitle: { fontSize: '13px', fontWeight: 700, color: '#e2e8f0' },
+  handleTitle: { fontSize: '14px', fontWeight: 700, color: '#f1f5f9' },
   handleArrow: (open) => ({
     fontSize: '18px', color: '#64748b',
     transition: 'transform 0.3s',
@@ -77,7 +76,7 @@ const ms = {
 // ---------- Shared styles ----------
 const sh = {
   head: { padding: '14px 16px', borderBottom: '1px solid #2d3148', flexShrink: 0 },
-  headTitle: { fontSize: '14px', fontWeight: 700, color: '#e2e8f0', marginBottom: '10px' },
+  headTitle: { fontSize: '14px', fontWeight: 700, color: '#f1f5f9', marginBottom: '10px' },
   filterRow: { display: 'flex', gap: '5px', flexWrap: 'wrap' },
   filterBtn: (active) => ({
     padding: '3px 9px', borderRadius: '20px', cursor: 'pointer', fontSize: '11px', fontWeight: 500,
@@ -86,7 +85,7 @@ const sh = {
     color: active ? '#818cf8' : '#64748b', transition: 'all 0.15s',
   }),
   list: { flex: 1, overflowY: 'auto', padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: '6px' },
-  empty: { textAlign: 'center', padding: '40px 16px', color: '#475569', fontSize: '13px' },
+  empty: { textAlign: 'center', padding: '40px 16px', color: '#64748b', fontSize: '13px' },
   card: (borderColor) => ({
     background: '#1e2130', border: `1px solid ${borderColor || '#2d3148'}`,
     borderRadius: '10px', overflow: 'hidden', cursor: 'pointer', transition: 'border-color 0.15s',
@@ -99,7 +98,7 @@ const sh = {
   }),
   cardTime: { fontSize: '10px', color: '#475569', marginLeft: 'auto', flexShrink: 0 },
   cardDesc: {
-    padding: '0 12px 8px', fontSize: '12px', color: '#94a3b8', lineHeight: 1.45,
+    padding: '0 12px 8px', fontSize: '12px', color: '#b0bec5', lineHeight: 1.5,
     display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
   },
   cardPhoto: { width: '100%', height: '80px', objectFit: 'cover', display: 'block' },
@@ -110,7 +109,7 @@ const sh = {
     display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '5px',
     border: '1px solid #2d3148', background: 'none', color: '#64748b', fontSize: '11px', cursor: 'pointer',
   },
-  coordText: { fontSize: '10px', color: '#334155', fontFamily: 'monospace' },
+  coordText: { fontSize: '10px', color: '#64748b', fontFamily: 'monospace' },
   deleteBtn: {
     marginLeft: 'auto', padding: '3px 8px', borderRadius: '5px', border: '1px solid #2d3148',
     background: 'none', color: '#475569', fontSize: '11px', cursor: 'pointer',
