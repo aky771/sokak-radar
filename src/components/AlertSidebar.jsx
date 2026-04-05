@@ -1,6 +1,7 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import useAlertStore, { ALERT_TYPES } from '../store/useAlertStore'
 import useAuthStore from '../store/useAuthStore'
+import { reverseGeocode } from '../utils/geocode'
 
 function timeAgo(iso) {
   if (!iso) return ''
@@ -17,13 +18,165 @@ function ExpiryBar({ expiresAt }) {
   const pct = Math.max(0, Math.min(100, (remaining / total) * 100))
   const color = pct > 50 ? '#10b981' : pct > 20 ? '#f59e0b' : '#ef4444'
   return (
-    <div style={{ height: '3px', background: '#2d3148' }}>
+    <div style={{ height: '3px', background: '#1a1d27' }}>
       <div style={{ width: `${pct}%`, height: '100%', background: color, transition: 'width 1s' }} />
     </div>
   )
 }
 
-// ---------- Desktop styles ----------
+function AvatarMini({ username, color }) {
+  return (
+    <div style={{
+      width: 18, height: 18, borderRadius: '50%', background: color || '#6366f1',
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: 9, fontWeight: 700, color: 'white', flexShrink: 0,
+    }}>
+      {(username || '?')[0].toUpperCase()}
+    </div>
+  )
+}
+
+// Adres lazy-geocode hook'u
+function useAddress(alert) {
+  const [address, setAddress] = useState(alert.address || null)
+  const fetchedRef = useRef(false)
+
+  useEffect(() => {
+    if (address || fetchedRef.current) return
+    fetchedRef.current = true
+    reverseGeocode(alert.lat, alert.lng).then((a) => { if (a) setAddress(a) })
+  }, [alert.id])
+
+  return address
+}
+
+// Tek kart bileşeni
+function AlertCard({ alert, onDetailClick, onUserClick, onMapClick }) {
+  const { voteOnAlert, userVotes } = useAlertStore()
+  const { user } = useAuthStore()
+  const [voting, setVoting] = useState(null)
+  const [hovered, setHovered] = useState(false)
+  const address = useAddress(alert)
+
+  const info = ALERT_TYPES[alert.type] || ALERT_TYPES.spotted
+  const myVote = userVotes[alert.id]
+
+  const handleVote = async (e, type) => {
+    e.stopPropagation()
+    if (!user || voting) return
+    setVoting(type)
+    await voteOnAlert(alert.id, type)
+    setVoting(null)
+  }
+
+  const voteBtn = (type) => {
+    const isLike = type === 'like'
+    const active = myVote === type
+    const count = isLike ? (alert.like_count || 0) : (alert.dislike_count || 0)
+    return (
+      <button
+        onClick={(e) => handleVote(e, type)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 4,
+          padding: '4px 8px', borderRadius: 6, cursor: user ? 'pointer' : 'default',
+          border: active ? `1px solid ${isLike ? '#10b98166' : '#ef444466'}` : '1px solid #2d3148',
+          background: active ? (isLike ? '#10b98118' : '#ef444418') : 'none',
+          color: active ? (isLike ? '#10b981' : '#ef4444') : '#64748b',
+          fontSize: 11, fontWeight: 600, transition: 'all 0.15s',
+          opacity: voting && voting !== type ? 0.5 : 1,
+        }}
+      >
+        <span style={{ fontSize: 13 }}>{isLike ? '👍' : '👎'}</span>
+        <span>{count}</span>
+      </button>
+    )
+  }
+
+  return (
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: '#1e2130',
+        border: `1px solid ${hovered ? info.color + '55' : '#2d3148'}`,
+        borderRadius: 10, overflow: 'hidden', transition: 'border-color 0.15s',
+      }}
+    >
+      {/* Kart başlığı */}
+      <div
+        onClick={() => onMapClick(alert)}
+        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px 6px', cursor: 'pointer' }}
+      >
+        <span style={{
+          display: 'inline-flex', alignItems: 'center', gap: 4,
+          padding: '2px 8px', borderRadius: 5,
+          background: info.bg, color: info.color,
+          fontSize: 11, fontWeight: 700, flexShrink: 0,
+        }}>
+          {info.emoji} {info.label}
+        </span>
+        <span style={{ fontSize: 10, color: '#475569', marginLeft: 'auto', flexShrink: 0 }}>
+          {timeAgo(alert.created_at)}
+        </span>
+      </div>
+
+      {/* Adres */}
+      {address && (
+        <div style={{ padding: '0 12px 4px', fontSize: 12, color: '#cbd5e1', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ fontSize: 11 }}>📍</span>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{address}</span>
+        </div>
+      )}
+
+      {/* Açıklama */}
+      {alert.description && (
+        <div style={{
+          padding: '0 12px 6px', fontSize: 12, color: '#94a3b8', lineHeight: 1.45,
+          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+        }}>
+          {alert.description}
+        </div>
+      )}
+
+      {/* Paylaşan kullanıcı */}
+      <div
+        onClick={() => onUserClick && onUserClick(alert.user_id, alert.username)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 5,
+          padding: '0 12px 8px', cursor: alert.user_id ? 'pointer' : 'default',
+        }}
+      >
+        <AvatarMini username={alert.username} color="#6366f188" />
+        <span style={{ fontSize: 11, color: '#6366f1aa', fontWeight: 500 }}>
+          @{alert.username || 'kullanıcı'}
+        </span>
+      </div>
+
+      {/* Footer: oy + ayrıntı */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px',
+        borderTop: '1px solid #1a1d27',
+      }}>
+        {voteBtn('like')}
+        {voteBtn('dislike')}
+        <button
+          onClick={() => onDetailClick(alert)}
+          style={{
+            marginLeft: 'auto', padding: '4px 10px', borderRadius: 6,
+            border: '1px solid #2d3148', background: 'none',
+            color: '#64748b', fontSize: 11, cursor: 'pointer',
+          }}
+        >
+          Ayrıntı ›
+        </button>
+      </div>
+
+      <ExpiryBar expiresAt={alert.expires_at} />
+    </div>
+  )
+}
+
+// ---- Desktop styles ----
 const ds = {
   sidebar: (open) => ({
     width: open ? '360px' : '0', minWidth: open ? '360px' : '0',
@@ -40,12 +193,11 @@ const ds = {
   },
 }
 
-// ---------- Mobile styles ----------
+// ---- Mobile styles ----
 const ms = {
   sheet: (open) => ({
     position: 'fixed', bottom: 0, left: 0, right: 0,
-    // dvh: Safari adres çubuğunu hariç tutar — overflow sorununu önler
-    height: open ? '65dvh' : 'calc(52px + env(safe-area-inset-bottom, 0px))',
+    height: open ? '65dvh' : 'var(--sheet-closed-h)',
     background: '#1a1d27',
     borderTop: '1px solid #2d3148',
     borderRadius: '16px 16px 0 0',
@@ -56,73 +208,33 @@ const ms = {
   }),
   handle: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    paddingTop: '0', paddingLeft: '16px', paddingRight: '16px',
-    paddingBottom: '0',
-    minHeight: '52px', flexShrink: 0, cursor: 'pointer',
+    paddingTop: 0, paddingLeft: 16, paddingRight: 16, paddingBottom: 0,
+    minHeight: 52, flexShrink: 0, cursor: 'pointer',
     position: 'relative', userSelect: 'none',
   },
-  handleBar: {
-    position: 'absolute', top: '8px', left: '50%', transform: 'translateX(-50%)',
-    width: '36px', height: '4px', borderRadius: '2px', background: '#3d4460',
-  },
-  handleTitle: { fontSize: '14px', fontWeight: 700, color: '#f1f5f9' },
-  handleArrow: (open) => ({
-    fontSize: '18px', color: '#64748b',
-    transition: 'transform 0.3s',
-    transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
-  }),
 }
 
-// ---------- Shared styles ----------
+// ---- Shared styles ----
 const sh = {
-  head: { padding: '14px 16px', borderBottom: '1px solid #2d3148', flexShrink: 0 },
-  headTitle: { fontSize: '14px', fontWeight: 700, color: '#f1f5f9', marginBottom: '10px' },
-  filterRow: { display: 'flex', gap: '5px', flexWrap: 'wrap' },
+  head: { padding: '10px 12px 8px', borderBottom: '1px solid #2d3148', flexShrink: 0 },
+  headTitle: { fontSize: '14px', fontWeight: 700, color: '#f1f5f9', marginBottom: '8px' },
+  filterRow: { display: 'flex', gap: '4px', flexWrap: 'wrap' },
   filterBtn: (active) => ({
     padding: '3px 9px', borderRadius: '20px', cursor: 'pointer', fontSize: '11px', fontWeight: 500,
     border: active ? '1px solid #6366f1' : '1px solid #2d3148',
     background: active ? '#6366f122' : 'transparent',
     color: active ? '#818cf8' : '#64748b', transition: 'all 0.15s',
   }),
-  list: { flex: 1, overflowY: 'auto', padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: '6px' },
+  list: {
+    flex: 1, overflowY: 'auto', padding: '8px 10px',
+    display: 'flex', flexDirection: 'column', gap: '6px',
+  },
   empty: { textAlign: 'center', padding: '40px 16px', color: '#64748b', fontSize: '13px' },
-  card: (borderColor) => ({
-    background: '#1e2130', border: `1px solid ${borderColor || '#2d3148'}`,
-    borderRadius: '10px', overflow: 'hidden', cursor: 'pointer', transition: 'border-color 0.15s',
-  }),
-  cardTop: { display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px 8px' },
-  typeBadge: (color, bg) => ({
-    display: 'inline-flex', alignItems: 'center', gap: '4px',
-    padding: '2px 8px', borderRadius: '5px', background: bg, color,
-    fontSize: '11px', fontWeight: 700, flexShrink: 0,
-  }),
-  cardTime: { fontSize: '10px', color: '#475569', marginLeft: 'auto', flexShrink: 0 },
-  cardDesc: {
-    padding: '0 12px 8px', fontSize: '12px', color: '#b0bec5', lineHeight: 1.5,
-    display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
-  },
-  cardPhoto: { width: '100%', height: '80px', objectFit: 'cover', display: 'block' },
-  cardFooter: {
-    display: 'flex', alignItems: 'center', padding: '6px 12px', borderTop: '1px solid #1a1d27', gap: '6px',
-  },
-  voteBtn: {
-    display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '5px',
-    border: '1px solid #2d3148', background: 'none', color: '#64748b', fontSize: '11px', cursor: 'pointer',
-  },
-  coordText: { fontSize: '10px', color: '#64748b', fontFamily: 'monospace' },
-  deleteBtn: {
-    marginLeft: 'auto', padding: '3px 8px', borderRadius: '5px', border: '1px solid #2d3148',
-    background: 'none', color: '#475569', fontSize: '11px', cursor: 'pointer',
-  },
 }
 
-export default function AlertSidebar({ onAlertClick, open, setOpen, isMobile }) {
+export default function AlertSidebar({ onAlertClick, onDetailClick, onUserClick, open, setOpen, isMobile }) {
   const alerts = useAlertStore((st) => st.alerts)
-  const removeAlert = useAlertStore((st) => st.removeAlert)
-  const voteAlert = useAlertStore((st) => st.voteAlert)
-  const { user } = useAuthStore()
   const [filter, setFilter] = useState('all')
-  const [hovered, setHovered] = useState(null)
 
   const filtered = filter === 'all' ? alerts : alerts.filter((a) => a.type === filter)
 
@@ -148,74 +260,41 @@ export default function AlertSidebar({ onAlertClick, open, setOpen, isMobile }) 
             <br /><span style={{ fontSize: '11px' }}>Haritaya tıklayarak ekleyin.</span>
           </div>
         )}
-        {filtered.map((alert) => {
-          const info = ALERT_TYPES[alert.type] || ALERT_TYPES.spotted
-          const isOwn = user && alert.user_id === user.id
-          return (
-            <div
-              key={alert.id}
-              style={sh.card(hovered === alert.id ? info.color : '#2d3148')}
-              onMouseEnter={() => setHovered(alert.id)}
-              onMouseLeave={() => setHovered(null)}
-              onClick={() => onAlertClick(alert)}
-            >
-              <div style={sh.cardTop}>
-                <span style={sh.typeBadge(info.color, info.bg)}>
-                  {info.emoji} {info.label}
-                </span>
-                <span style={sh.cardTime}>{timeAgo(alert.created_at)}</span>
-              </div>
-              {alert.photo_url && <img src={alert.photo_url} alt="" style={sh.cardPhoto} />}
-              {alert.description && <div style={sh.cardDesc}>{alert.description}</div>}
-              <ExpiryBar expiresAt={alert.expires_at} />
-              <div style={sh.cardFooter}>
-                <span style={sh.coordText}>
-                  {alert.lat?.toFixed(4)}, {alert.lng?.toFixed(4)}
-                </span>
-                <button
-                  style={sh.voteBtn}
-                  onClick={(e) => { e.stopPropagation(); voteAlert(alert.id) }}
-                  onMouseEnter={(e) => { e.currentTarget.style.color = '#10b981' }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = '#64748b' }}
-                >
-                  👍 {alert.votes}
-                </button>
-                {isOwn && (
-                  <button
-                    style={sh.deleteBtn}
-                    onClick={(e) => { e.stopPropagation(); removeAlert(alert.id) }}
-                    onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
-                    onMouseLeave={(e) => (e.currentTarget.style.color = '#475569')}
-                  >
-                    Sil
-                  </button>
-                )}
-              </div>
-            </div>
-          )
-        })}
+        {filtered.map((alert) => (
+          <AlertCard
+            key={alert.id}
+            alert={alert}
+            onMapClick={onAlertClick}
+            onDetailClick={onDetailClick}
+            onUserClick={onUserClick}
+          />
+        ))}
       </div>
     </>
   )
 
-  // ---------- MOBİL: Alt çekmece ----------
   if (isMobile) {
     return (
       <div style={ms.sheet(open)}>
-        {/* Sürükleme tutacağı */}
         <div style={ms.handle} onClick={() => setOpen(!open)}>
-          <div style={ms.handleBar} />
-          <span style={ms.handleTitle}>
+          <div style={{
+            position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)',
+            width: 36, height: 4, borderRadius: 2, background: '#3d4460',
+          }} />
+          <span style={{ fontSize: 14, fontWeight: 700, color: '#f1f5f9' }}>
             {open ? 'Uyarılar' : `Uyarılar (${filtered.length})`}
           </span>
-          <span style={ms.handleArrow(open)}>⌃</span>
+          <span style={{
+            fontSize: 18, color: '#64748b',
+            transition: 'transform 0.3s',
+            transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
+          }}>⌃</span>
         </div>
         {alertList}
       </div>
     )
   }
 
-  // ---------- MASAÜSTÜ: Sağ panel ----------
   return (
     <div style={ds.sidebar(open)}>
       <button style={ds.toggle} onClick={() => setOpen(!open)}>

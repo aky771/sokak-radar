@@ -1,11 +1,13 @@
-import React, { useState, useCallback, useEffect } from 'react'
+import React, { useState, useCallback, useEffect, useRef } from 'react'
 import Header from './components/Header'
 import MapView from './components/MapView'
 import AlertSidebar from './components/AlertSidebar'
 import AddAlertModal from './components/AddAlertModal'
 import AuthModal from './components/AuthModal'
 import AdminPanel from './components/AdminPanel'
-import useAlertStore from './store/useAlertStore'
+import AlertDetailModal from './components/AlertDetailModal'
+import UserProfileModal from './components/UserProfileModal'
+import useAlertStore, { ALERT_TYPES } from './store/useAlertStore'
 import useAuthStore from './store/useAuthStore'
 import useGeolocation from './hooks/useGeolocation'
 import useIsMobile from './hooks/useIsMobile'
@@ -17,8 +19,17 @@ const blurBg = (bg) => ({
   WebkitBackdropFilter: 'blur(8px)',
 })
 
+// Haversine mesafe (km)
+function distKm(lat1, lng1, lat2, lng2) {
+  const R = 6371
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLng = (lng2 - lng1) * Math.PI / 180
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
 const s = {
-  // height → index.css .app-root sınıfından geliyor (100dvh Safari fix)
   app: { display: 'flex', flexDirection: 'column', overflow: 'hidden' },
   content: { display: 'flex', flex: 1, overflow: 'hidden', position: 'relative' },
   mapWrapper: { flex: 1, position: 'relative', overflow: 'hidden' },
@@ -54,25 +65,47 @@ export default function App() {
   const isMobile = useIsMobile()
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 768)
 
-  const [clickedPos, setClickedPos]         = useState(null)
-  const [modalOpen, setModalOpen]           = useState(false)
-  const [authModalOpen, setAuthModalOpen]   = useState(false)
-  const [showAdmin, setShowAdmin]           = useState(false)
-  const [pendingPos, setPendingPos]         = useState(null)
-  const [flyTarget, setFlyTarget]           = useState(null)
-  const [toast, setToast]                   = useState({ msg: '', visible: false })
-  const [manualPickMode, setManualPickMode] = useState(false)
-  const [showLocHelp, setShowLocHelp]       = useState(false)
+  const [clickedPos, setClickedPos]             = useState(null)
+  const [modalOpen, setModalOpen]               = useState(false)
+  const [authModalOpen, setAuthModalOpen]       = useState(false)
+  const [showAdmin, setShowAdmin]               = useState(false)
+  const [pendingPos, setPendingPos]             = useState(null)
+  const [flyTarget, setFlyTarget]               = useState(null)
+  const [toast, setToast]                       = useState({ msg: '', visible: false })
+  const [manualPickMode, setManualPickMode]     = useState(false)
+  const [detailAlert, setDetailAlert]           = useState(null)   // AlertDetailModal
+  const [profileUserId, setProfileUserId]       = useState(null)   // UserProfileModal
+
+  // Yakın uyarı bildirimi
+  const [nearbyAlert, setNearbyAlert] = useState(null)
+  const locationRef = useRef(null)
+  useEffect(() => { locationRef.current = location }, [location])
 
   const supabaseConfigured = !!(
     import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY
   )
 
+  const showToast = useCallback((msg, duration = 3000) => {
+    setToast({ msg, visible: true })
+    setTimeout(() => setToast((t) => ({ ...t, visible: false })), duration)
+  }, [])
+
+  // Yakın uyarı gelince bildirim göster
+  const handleNewAlert = useCallback((alert) => {
+    const loc = locationRef.current
+    if (!loc) return
+    const km = distKm(loc.lat, loc.lng, alert.lat, alert.lng)
+    if (km <= 1) {
+      setNearbyAlert(alert)
+      setTimeout(() => setNearbyAlert(null), 8000)
+    }
+  }, [])
+
   useEffect(() => {
     if (!supabaseConfigured) return
     initAuth()
     fetchAlerts()
-    const unsub = subscribeToAlerts()
+    const unsub = subscribeToAlerts(handleNewAlert)
     const interval = setInterval(fetchAlerts, 5 * 60 * 1000)
     return () => { unsub(); clearInterval(interval) }
   }, [supabaseConfigured])
@@ -88,11 +121,6 @@ export default function App() {
   useEffect(() => {
     if (!isMobile) setSidebarOpen(true)
   }, [isMobile])
-
-  const showToast = useCallback((msg) => {
-    setToast({ msg, visible: true })
-    setTimeout(() => setToast((t) => ({ ...t, visible: false })), 3000)
-  }, [])
 
   const handleMapClick = useCallback((pos) => {
     if (manualPickMode) {
@@ -152,6 +180,14 @@ export default function App() {
     if (isMobile) setSidebarOpen(false)
   }, [isMobile])
 
+  const handleDetailClick = useCallback((alert) => {
+    setDetailAlert(alert)
+  }, [])
+
+  const handleUserClick = useCallback((userId) => {
+    if (userId) setProfileUserId(userId)
+  }, [])
+
   const locationBadge = () => {
     if (gpsLocation) return { dot: '#10b981', text: `GPS ±${gpsAccuracy}m` }
     if (manualLocation) return { dot: '#6366f1', text: '📌 Manuel' }
@@ -163,13 +199,12 @@ export default function App() {
   }
   const badge = locationBadge()
 
-  // Gerçek kalıcı red: Permissions API 'denied' dediyse VEYA GPS kodu 1 aldıysa
   const trulyDenied = permissionState === 'denied' || gpsStatus === 'denied'
   const showManualHint = !gpsLocation && !manualLocation &&
     (trulyDenied || gpsStatus === 'unreliable' || gpsStatus === 'error' || gpsStatus === 'waiting')
 
-  const fabBottom   = isMobile ? 'calc(72px + env(safe-area-inset-bottom, 0px))' : '24px'
-  const badgeBottom = isMobile ? 'calc(126px + env(safe-area-inset-bottom, 0px))' : '80px'
+  const fabBottom   = isMobile ? 'var(--fab-bottom)' : '24px'
+  const badgeBottom = isMobile ? 'var(--badge-bottom)' : '80px'
 
   const btnStyle = {
     background: '#f59e0b22', border: '1px solid #f59e0b66', color: '#fbbf24',
@@ -220,12 +255,21 @@ VITE_SUPABASE_ANON_KEY=eyJ...`}
     return <AdminPanel onClose={() => setShowAdmin(false)} />
   }
 
+  const sidebarProps = {
+    onAlertClick: handleAlertClick,
+    onDetailClick: handleDetailClick,
+    onUserClick: handleUserClick,
+    open: sidebarOpen,
+    setOpen: setSidebarOpen,
+  }
+
   return (
     <>
       <div style={s.app} className="app-root">
         <Header
           onLoginClick={() => setAuthModalOpen(true)}
           onAdminClick={() => setShowAdmin(true)}
+          onProfileClick={() => user && setProfileUserId(user.id)}
           isMobile={isMobile}
         />
         <div style={s.content}>
@@ -264,10 +308,52 @@ VITE_SUPABASE_ANON_KEY=eyJ...`}
               {toast.msg}
             </div>
 
-            {/* Konum izni yok / GPS hatası → buton göster */}
-            {showManualHint && (
+            {/* Yakın uyarı bildirimi */}
+            {nearbyAlert && (
               <div style={{
                 position: 'absolute', top: '52px', left: '50%', transform: 'translateX(-50%)',
+                zIndex: 850, maxWidth: '92%',
+                ...blurBg('#1e3a5fee'),
+                border: '1px solid #3b82f666', borderRadius: '14px', padding: '10px 14px',
+                display: 'flex', alignItems: 'center', gap: '10px',
+                boxShadow: '0 4px 20px rgba(59,130,246,0.3)',
+                animation: 'slideDown 0.3s ease',
+              }}>
+                <span style={{ fontSize: 22 }}>
+                  {(ALERT_TYPES[nearbyAlert.type] || {}).emoji || '📡'}
+                </span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#93c5fd' }}>
+                    📍 Yakınınızda yeni uyarı!
+                  </div>
+                  <div style={{ fontSize: 11, color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {nearbyAlert.address || nearbyAlert.description || 'Uyarıyı görüntüle'}
+                  </div>
+                </div>
+                <button
+                  onClick={() => { setDetailAlert(nearbyAlert); setNearbyAlert(null) }}
+                  style={{
+                    background: '#3b82f6', border: 'none', color: 'white',
+                    padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                    flexShrink: 0,
+                  }}
+                >
+                  Gör
+                </button>
+                <button
+                  onClick={() => setNearbyAlert(null)}
+                  style={{ background: 'none', border: 'none', color: '#64748b', fontSize: 16, cursor: 'pointer', padding: '2px 4px' }}
+                >
+                  ×
+                </button>
+              </div>
+            )}
+
+            {/* Konum izni yok / GPS hatası */}
+            {showManualHint && (
+              <div style={{
+                position: 'absolute', top: nearbyAlert ? '108px' : '52px',
+                left: '50%', transform: 'translateX(-50%)',
                 zIndex: 800, ...blurBg('#78350fee'),
                 border: '1px solid #f59e0b44', borderRadius: '12px', padding: '10px 14px',
                 fontSize: '12px', color: '#fcd34d',
@@ -275,7 +361,6 @@ VITE_SUPABASE_ANON_KEY=eyJ...`}
                 maxWidth: '92%', textAlign: 'center',
               }}>
                 {trulyDenied ? (
-                  // Kalıcı red → Adım adım Safari ayarları rehberi
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', width: '100%' }}>
                     <span style={{ fontWeight: 700, fontSize: '13px' }}>🔒 Konum izni reddedildi</span>
                     {isMobile && (
@@ -316,12 +401,9 @@ VITE_SUPABASE_ANON_KEY=eyJ...`}
                     </button>
                   </div>
                 ) : (
-                  // Dismissed veya bekleniyor → tekrar dialog açılabilir
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
                     <span>⚠️ {gpsStatus === 'waiting' ? 'Konum izni bekleniyor' : 'GPS sinyali zayıf'}</span>
-                    <button onClick={requestLocation} style={btnStyle}>
-                      📍 Tekrar İzin İste
-                    </button>
+                    <button onClick={requestLocation} style={btnStyle}>📍 Tekrar İzin İste</button>
                     <button
                       onClick={() => setManualPickMode(true)}
                       style={{ ...btnStyle, background: 'none', border: 'none', textDecoration: 'underline', padding: '3px 4px' }}
@@ -389,25 +471,11 @@ VITE_SUPABASE_ANON_KEY=eyJ...`}
             </div>
           </div>
 
-          {!isMobile && (
-            <AlertSidebar
-              onAlertClick={handleAlertClick}
-              open={sidebarOpen}
-              setOpen={setSidebarOpen}
-              isMobile={false}
-            />
-          )}
+          {!isMobile && <AlertSidebar {...sidebarProps} isMobile={false} />}
         </div>
       </div>
 
-      {isMobile && (
-        <AlertSidebar
-          onAlertClick={handleAlertClick}
-          open={sidebarOpen}
-          setOpen={setSidebarOpen}
-          isMobile={true}
-        />
-      )}
+      {isMobile && <AlertSidebar {...sidebarProps} isMobile={true} />}
 
       {modalOpen && (
         <AddAlertModal
@@ -423,6 +491,25 @@ VITE_SUPABASE_ANON_KEY=eyJ...`}
           message={pendingPos ? 'Uyarı eklemek için giriş yapın' : undefined}
           onClose={() => { setAuthModalOpen(false); setPendingPos(null) }}
           onSuccess={handleAuthSuccess}
+        />
+      )}
+
+      {detailAlert && (
+        <AlertDetailModal
+          alert={detailAlert}
+          onClose={() => setDetailAlert(null)}
+          onUserClick={(uid) => { setDetailAlert(null); setProfileUserId(uid) }}
+        />
+      )}
+
+      {profileUserId && (
+        <UserProfileModal
+          userId={profileUserId}
+          onClose={() => setProfileUserId(null)}
+          onAlertFocus={(alert) => {
+            handleAlertClick(alert)
+            setDetailAlert(alert)
+          }}
         />
       )}
     </>

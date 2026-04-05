@@ -36,12 +36,27 @@ html, body, #root {
   height: 100dvh;  /* iOS 15.4+ — adres çubuğu hariç, düzgün boyutlandırma */
 }
 
-/* iOS Safe Area — viewport-fit=cover ile çentik/home bar desteği */
+/* iOS Safe Area — viewport-fit=cover ile çentik/home bar desteği
+   Safari'de calc()+env() inline style olarak çalışmaz,
+   bu yüzden hesaplanan değerleri CSS değişkeni olarak tanımlıyoruz. */
 :root {
   --sat: env(safe-area-inset-top, 0px);
   --sab: env(safe-area-inset-bottom, 0px);
-  --sal: env(safe-area-inset-left, 0px);
-  --sar: env(safe-area-inset-right, 0px);
+  /* Alt FAB butonu konumu */
+  --fab-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  /* Konum rozeti konumu (FAB'ın üstü) */
+  --badge-bottom: calc(126px + env(safe-area-inset-bottom, 0px));
+  /* Mobil sheet kapalıyken yüksekliği */
+  --sheet-closed-h: calc(52px + env(safe-area-inset-bottom, 0px));
+}
+
+/* Header: safe-area-inset-top sadece CSS class ile güvenilir çalışır */
+.app-header {
+  padding-top: env(safe-area-inset-top, 0px);
+  background: #0f1117;
+  border-bottom: 1px solid #2d3148;
+  z-index: 1000;
+  flex-shrink: 0;
 }
 
 /* Scrollbar */

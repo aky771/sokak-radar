@@ -56,6 +56,22 @@ const useAuthStore = create((set, get) => ({
   },
 
   isAdmin: () => get().user?.email === ADMIN_EMAIL,
+
+  updateProfile: async (updates) => {
+    const userId = get().user?.id
+    if (!userId) return { error: new Error('Giriş yapılmamış') }
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        username:     updates.username     ?? undefined,
+        display_name: updates.display_name ?? null,
+        bio:          updates.bio          ?? null,
+        avatar_color: updates.avatar_color ?? undefined,
+      })
+      .eq('id', userId)
+    if (!error) await get().fetchProfile(userId)
+    return { error }
+  },
 }))
 
 export default useAuthStore

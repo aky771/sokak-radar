@@ -2,21 +2,17 @@ import React from 'react'
 import useAlertStore from '../store/useAlertStore'
 import useAuthStore from '../store/useAuthStore'
 
-export default function Header({ onLoginClick, onAdminClick, isMobile }) {
+export default function Header({ onLoginClick, onAdminClick, onProfileClick, isMobile }) {
   const alerts = useAlertStore((st) => st.alerts)
   const { user, profile, signOut, isAdmin } = useAuthStore()
 
   const s = {
-    header: {
+    // Dış header .app-header CSS sınıfından stilini alır (safe-area-inset-top için)
+    inner: {
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      paddingTop: 'env(safe-area-inset-top, 0px)',
       paddingLeft: isMobile ? '12px' : '20px',
       paddingRight: isMobile ? '12px' : '20px',
-      paddingBottom: 0,
-      minHeight: isMobile ? '52px' : '58px',
-      height: isMobile ? 'calc(52px + env(safe-area-inset-top, 0px))' : '58px',
-      background: '#0f1117', borderBottom: '1px solid #2d3148',
-      zIndex: 1000, flexShrink: 0,
+      height: isMobile ? '52px' : '58px',
     },
     logo: { display: 'flex', alignItems: 'center', gap: '8px' },
     logoText: { fontSize: isMobile ? '15px' : '18px', fontWeight: 700, color: '#e2e8f0', letterSpacing: '-0.3px' },
@@ -43,7 +39,8 @@ export default function Header({ onLoginClick, onAdminClick, isMobile }) {
   }
 
   return (
-    <header style={s.header}>
+    <header className="app-header">
+      <div style={s.inner}>
       <div style={s.logo}>
         <span style={{ fontSize: isMobile ? '18px' : '22px' }}>📡</span>
         <div>
@@ -62,11 +59,24 @@ export default function Header({ onLoginClick, onAdminClick, isMobile }) {
 
         {user ? (
           <>
-            {!isMobile && (
-              <span style={s.username}>
-                {profile?.username || user.email?.split('@')[0]}
-              </span>
-            )}
+            {/* Profil avatar butonu */}
+            <button
+              onClick={onProfileClick}
+              style={{
+                width: isMobile ? 30 : 34, height: isMobile ? 30 : 34,
+                borderRadius: '50%',
+                background: profile?.avatar_color || '#6366f1',
+                border: '2px solid #2d3148', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: isMobile ? 13 : 14, fontWeight: 700, color: 'white',
+                flexShrink: 0, transition: 'border-color 0.15s',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#6366f1')}
+              onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#2d3148')}
+              title={profile?.username || user.email}
+            >
+              {(profile?.username || user.email || '?')[0].toUpperCase()}
+            </button>
             {isAdmin() && (
               <button
                 style={s.btn('admin')}
@@ -96,6 +106,7 @@ export default function Header({ onLoginClick, onAdminClick, isMobile }) {
             {isMobile ? 'Giriş' : 'Giriş Yap'}
           </button>
         )}
+      </div>
       </div>
     </header>
   )
