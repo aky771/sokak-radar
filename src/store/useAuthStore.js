@@ -42,7 +42,12 @@ const useAuthStore = create((set, get) => ({
       password,
       options: { data: { username } },
     })
-    return { user: data?.user || null, error }
+    // session: e-posta doğrulama kapalıysa anında oturum açılır
+    return {
+      user: data?.user || null,
+      session: data?.session || null,
+      error,
+    }
   },
 
   signOut: async () => {

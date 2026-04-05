@@ -2,6 +2,13 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 
 const GPS_ACCURACY_THRESHOLD = 500
 
+// watchPosition için seçenekler
+const WATCH_OPTS = {
+  enableHighAccuracy: true,
+  maximumAge: 30000,  // 30s önbellek → iOS'ta ilk fix hızlanır
+  timeout: 60000,     // 60s → iç mekânda GPS için yeterli süre
+}
+
 export default function useGeolocation() {
   const [ipLocation, setIpLocation]         = useState(null)
   const [gpsLocation, setGpsLocation]       = useState(null)
@@ -35,12 +42,12 @@ export default function useGeolocation() {
     return () => ctrl.abort()
   }, [])
 
-  // ── GPS helpers ────────────────────────────────────────────────
+  // ── GPS yardımcıları ───────────────────────────────────────────
   const handlePosition = useCallback((pos) => {
     const { latitude, longitude, accuracy } = pos.coords
     setGpsAccuracy(Math.round(accuracy))
     if (accuracy >= GPS_ACCURACY_THRESHOLD) {
-      setGpsStatus('unreliable')
+      setGpsStatus((s) => s === 'good' ? s : 'unreliable')
       return
     }
     if (accuracy < bestAccRef.current) {
@@ -51,35 +58,34 @@ export default function useGeolocation() {
   }, [])
 
   const handleError = useCallback((err) => {
+    // TIMEOUT (code 3) → watchPosition devam ediyor, 'error' verme
     if (err.code === 1) setGpsStatus('denied')
-    else setGpsStatus('error')
+    else if (err.code !== 3) setGpsStatus('error')
+    // code 3 = timeout, bir sonraki denemede düzelir — mevcut status korunur
   }, [])
 
-  // ── 2. GPS — watchPosition HER ZAMAN başlar ────────────────────
-  // iOS Safari dahil tüm tarayıcılarda izin isteği bu tetikler.
-  // getCurrentPosition'a bağımlı DEĞİL; biri başarısız olsa diğeri çalışmaya devam eder.
+  // ── 2. Otomatik GPS ────────────────────────────────────────────
   useEffect(() => {
-    if (!navigator.geolocation) {
-      setGpsStatus('error')
-      return
-    }
+    if (!navigator.geolocation) { setGpsStatus('error'); return }
 
-    // watchPosition → izin isteğini tetikler + sürekli takip
+    // watchPosition HER ZAMAN başlar — getCurrentPosition'a bağlı değil
     watchIdRef.current = navigator.geolocation.watchPosition(
-      handlePosition,
-      handleError,
-      {
-        enableHighAccuracy: true,
-        maximumAge: 10000,   // 10s önbellek kabul et — iOS'ta ilk fix hızlanır
-        timeout: 30000,      // 30s — iç mekan GPS için yeterli süre
-      }
+      handlePosition, handleError, WATCH_OPTS
     )
 
-    // getCurrentPosition → daha hızlı ilk konum (watch ile paralel çalışır)
+    // Hızlı ilk konum için low-accuracy getCurrentPosition (cell/WiFi tabanlı)
+    // iOS Safari'de izin istemi için user gesture olmasa da çalışır
     navigator.geolocation.getCurrentPosition(
       handlePosition,
-      () => {},             // getCurrentPosition hatası watchPosition'ı etkilemez
-      { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
+      () => {
+        // Low accuracy başarısız → high accuracy dene
+        navigator.geolocation.getCurrentPosition(
+          handlePosition,
+          () => {}, // sessizce başarısız ol, watch devam ediyor
+          { enableHighAccuracy: true, maximumAge: 30000, timeout: 20000 }
+        )
+      },
+      { enableHighAccuracy: false, maximumAge: 30000, timeout: 8000 }
     )
 
     return () => {
@@ -88,27 +94,39 @@ export default function useGeolocation() {
     }
   }, [handlePosition, handleError])
 
-  // ── 3. Kullanıcı butonu ile tekrar iste ────────────────────────
-  // iOS'ta Settings'den izin verince sayfayı yenilemek gerekir.
-  // Bu fonksiyon "Yenile" butonundan çağrılır.
+  // ── 3. Kullanıcı "İzin Ver" butonuyla tetikler ─────────────────
   const requestLocation = useCallback(() => {
     if (!navigator.geolocation) return
     setGpsStatus('waiting')
     bestAccRef.current = Infinity
 
+    // Önce low accuracy (hızlı, cell/WiFi — iOS'ta saniyeler içinde döner)
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         handlePosition(pos)
-        // Eski watch'ı durdur, yenisini başlat
+        // Başarılı → high accuracy watch'ı yeniden başlat
         if (watchIdRef.current !== null)
           navigator.geolocation.clearWatch(watchIdRef.current)
         watchIdRef.current = navigator.geolocation.watchPosition(
-          handlePosition, handleError,
+          handlePosition, handleError, WATCH_OPTS
+        )
+      },
+      () => {
+        // Low accuracy başarısız → high accuracy dene (izin yoksa reddedilir)
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            handlePosition(pos)
+            if (watchIdRef.current !== null)
+              navigator.geolocation.clearWatch(watchIdRef.current)
+            watchIdRef.current = navigator.geolocation.watchPosition(
+              handlePosition, handleError, WATCH_OPTS
+            )
+          },
+          handleError,
           { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 }
         )
       },
-      handleError,
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
+      { enableHighAccuracy: false, maximumAge: 30000, timeout: 10000 }
     )
   }, [handlePosition, handleError])
 
