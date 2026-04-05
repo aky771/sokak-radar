@@ -301,7 +301,7 @@ VITE_SUPABASE_ANON_KEY=eyJ...`}
     )
   }
 
-  if (showAdmin && (isAdmin() || user?.email?.trim().toLowerCase() === import.meta.env.VITE_ADMIN_EMAIL?.trim().toLowerCase())) {
+  if (showAdmin && isAdmin()) {
     return <AdminPanel onClose={() => setShowAdmin(false)} />
   }
 

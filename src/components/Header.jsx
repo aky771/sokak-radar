@@ -77,7 +77,7 @@ export default function Header({ onLoginClick, onAdminClick, onProfileClick, isM
             >
               {(profile?.username || user.email || '?')[0].toUpperCase()}
             </button>
-            {(isAdmin() || user?.email?.trim().toLowerCase() === import.meta.env.VITE_ADMIN_EMAIL?.trim().toLowerCase()) && (
+            {isAdmin() && (
               <button
                 style={s.btn('admin')}
                 onClick={onAdminClick}

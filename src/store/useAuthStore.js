@@ -57,8 +57,11 @@ const useAuthStore = create((set, get) => ({
   },
 
   isAdmin: () => {
+    // 1. Birincil kontrol: DB'deki is_admin flag'i (en güvenilir)
+    if (get().profile?.is_admin === true) return true
+    // 2. Yedek kontrol: email karşılaştırması
     const email = get().user?.email?.trim().toLowerCase()
-    return !!email && email === ADMIN_EMAIL.trim().toLowerCase()
+    return !!email && !!ADMIN_EMAIL && email === ADMIN_EMAIL.trim().toLowerCase()
   },
 
   updateProfile: async (updates) => {
