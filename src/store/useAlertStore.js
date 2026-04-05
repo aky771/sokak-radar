@@ -149,6 +149,15 @@ const useAlertStore = create((set, get) => ({
     set((state) => ({ alerts: state.alerts.filter((a) => a.id !== id) }))
   },
 
+  // Profil güncellenince kullanıcının uyarılarındaki username'i güncelle
+  updateUsernameInAlerts: (userId, username) => {
+    set((state) => ({
+      alerts: state.alerts.map((a) =>
+        a.user_id === userId ? { ...a, username } : a
+      ),
+    }))
+  },
+
   // like veya dislike at — toggle, 8+ dislike = otomatik silme
   voteOnAlert: async (alertId, voteType) => {
     // --- Optimistik güncelleme: sunucu yanıtı beklemeden UI'ı hemen güncelle ---

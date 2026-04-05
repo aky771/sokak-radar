@@ -64,10 +64,15 @@ function useAddress(alert) {
 // Tek kart bileşeni
 function AlertCard({ alert, onDetailClick, onUserClick, onMapClick, userLocation }) {
   const { voteOnAlert, userVotes } = useAlertStore()
-  const { user } = useAuthStore()
+  const { user, profile } = useAuthStore()
   const [voting, setVoting] = useState(null)
   const [hovered, setHovered] = useState(false)
   const address = useAddress(alert)
+
+  // Kendi uyarılarında canlı profil verisi kullan (renk/kullanıcı adı değişince anında yansısın)
+  const isOwn = alert.user_id === user?.id
+  const displayUsername = isOwn && profile?.username ? profile.username : alert.username
+  const avatarColor = isOwn && profile?.avatar_color ? profile.avatar_color : '#6366f188'
 
   const info = ALERT_TYPES[alert.type] || ALERT_TYPES.spotted
   const myVote = userVotes[alert.id]
@@ -172,9 +177,9 @@ function AlertCard({ alert, onDetailClick, onUserClick, onMapClick, userLocation
           padding: '0 12px 8px', cursor: alert.user_id ? 'pointer' : 'default',
         }}
       >
-        <AvatarMini username={alert.username} color="#6366f188" />
+        <AvatarMini username={displayUsername} color={avatarColor} />
         <span style={{ fontSize: 11, color: '#6366f1aa', fontWeight: 500 }}>
-          @{alert.username || 'kullanıcı'}
+          @{displayUsername || 'kullanıcı'}
         </span>
       </div>
 

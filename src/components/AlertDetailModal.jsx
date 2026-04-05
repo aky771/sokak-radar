@@ -47,7 +47,7 @@ function AvatarCircle({ username, color, size = 36 }) {
 
 export default function AlertDetailModal({ alert, onClose, onUserClick }) {
   const { voteOnAlert, userVotes, removeAlert } = useAlertStore()
-  const { user } = useAuthStore()
+  const { user, profile } = useAuthStore()
   const isMobile = useIsMobile()
   const [voting, setVoting] = useState(false)
   const [imgExpanded, setImgExpanded] = useState(false)
@@ -57,6 +57,10 @@ export default function AlertDetailModal({ alert, onClose, onUserClick }) {
   const info = ALERT_TYPES[alert.type] || ALERT_TYPES.spotted
   const myVote = userVotes[alert.id]
   const isOwn = user && alert.user_id === user.id
+
+  // Kendi uyarısında canlı profil verisi kullan
+  const displayUsername = isOwn && profile?.username ? profile.username : alert.username
+  const avatarColor = isOwn && profile?.avatar_color ? profile.avatar_color : '#6366f1'
 
   const handleVote = async (type) => {
     if (!user) return
@@ -186,13 +190,13 @@ export default function AlertDetailModal({ alert, onClose, onUserClick }) {
               border: '1px solid #2d3148',
               cursor: alert.user_id ? 'pointer' : 'default',
             }}
-            onClick={() => alert.user_id && onUserClick && onUserClick(alert.user_id, alert.username)}
+            onClick={() => alert.user_id && onUserClick && onUserClick(alert.user_id, displayUsername)}
           >
-            <AvatarCircle username={alert.username} color="#6366f1" size={32} />
+            <AvatarCircle username={displayUsername} color={avatarColor} size={32} />
             <div>
               <div style={{ fontSize: 12, color: '#94a3b8' }}>Paylaşan</div>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#c7d2fe' }}>
-                @{alert.username || 'Kullanıcı'}
+                @{displayUsername || 'Kullanıcı'}
               </div>
             </div>
             {alert.user_id && (

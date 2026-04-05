@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { supabase, ADMIN_EMAIL } from '../lib/supabase'
+import useAlertStore from './useAlertStore'
 
 const useAuthStore = create((set, get) => ({
   user: null,
@@ -66,17 +67,24 @@ const useAuthStore = create((set, get) => ({
     if (!userId) return { error: new Error('Giriş yapılmamış') }
 
     // UPDATE yerine UPSERT — profil satırı yoksa oluşturur
+    const newUsername = updates.username ?? get().profile?.username ?? userEmail?.split('@')[0] ?? 'kullanici'
     const { error } = await supabase
       .from('profiles')
       .upsert({
         id:           userId,
         email:        userEmail ?? null,
-        username:     updates.username     ?? get().profile?.username ?? userEmail?.split('@')[0] ?? 'kullanici',
+        username:     newUsername,
         display_name: updates.display_name ?? null,
         bio:          updates.bio          ?? null,
         avatar_color: updates.avatar_color ?? get().profile?.avatar_color ?? '#6366f1',
       }, { onConflict: 'id' })
-    if (!error) await get().fetchProfile(userId)
+    if (!error) {
+      await get().fetchProfile(userId)
+      // Zustand alert store'daki bu kullanıcının uyarılarını hemen güncelle
+      useAlertStore.getState().updateUsernameInAlerts(userId, newUsername)
+      // DB'deki uyarı kayıtlarını da güncelle (best-effort, RLS izin verirse)
+      supabase.from('alerts').update({ username: newUsername }).eq('user_id', userId)
+    }
     return { error }
   },
 }))
