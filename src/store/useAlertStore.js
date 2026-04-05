@@ -73,12 +73,41 @@ const useAlertStore = create((set, get) => ({
   },
 
   addAlert: async (alertData, userId, username) => {
-    let photoUrl = null
+    // --- Koordinat doğrulama ---
+    const lat = Number(alertData.lat)
+    const lng = Number(alertData.lng)
+    if (!isFinite(lat) || !isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      return { data: null, error: new Error('Geçersiz konum koordinatları') }
+    }
 
+    // --- İzin verilen türler ---
+    const VALID_TYPES = ['traffic','accident','hazard','police','roadwork','closure','spotted','flood']
+    if (!VALID_TYPES.includes(alertData.type)) {
+      return { data: null, error: new Error('Geçersiz uyarı türü') }
+    }
+
+    // --- İstemci taraflı rate limit: 60 saniyede en fazla 3 uyarı ---
+    const now = Date.now()
+    const recent = (get()._recentAlertTimes || []).filter((t) => now - t < 60_000)
+    if (recent.length >= 3) {
+      return { data: null, error: new Error('Çok fazla uyarı. Lütfen 1 dakika bekleyin.') }
+    }
+    get()._recentAlertTimes = [...recent, now]
+
+    // --- Açıklama uzunluğu ---
+    const description = alertData.description
+      ? String(alertData.description).slice(0, 500).trim() || null
+      : null
+
+    // --- Fotoğraf yükleme ---
+    let photoUrl = null
     if (alertData.photo) {
       try {
         const res = await fetch(alertData.photo)
+        if (!res.ok) throw new Error('Fotoğraf alınamadı')
         const blob = await res.blob()
+        // Maksimum 5MB
+        if (blob.size > 5 * 1024 * 1024) throw new Error('Fotoğraf çok büyük')
         const filename = `${userId}/${Date.now()}.jpg`
         const { error: uploadErr } = await supabase.storage
           .from('alert-photos')
@@ -89,27 +118,25 @@ const useAlertStore = create((set, get) => ({
             .getPublicUrl(filename)
           photoUrl = publicUrl
         }
-      } catch (_) {}
+      } catch (_) { /* Fotoğraf yüklenemezse uyarı yine de eklenir */ }
     }
 
-    // Oluşturulurken adresi al ve kaydet
+    // --- Adres ---
     let address = null
-    try {
-      address = await reverseGeocode(alertData.lat, alertData.lng)
-    } catch (_) {}
+    try { address = await reverseGeocode(lat, lng) } catch (_) {}
 
     const { data, error } = await supabase
       .from('alerts')
       .insert({
-        type: alertData.type,
-        description: alertData.description || null,
-        photo_url: photoUrl,
-        lat: alertData.lat,
-        lng: alertData.lng,
-        user_id: userId,
-        username: username || 'Kullanıcı',
-        address: address,
-        expires_at: new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString(),
+        type:        alertData.type,
+        description,
+        photo_url:   photoUrl,
+        lat,
+        lng,
+        user_id:     userId,
+        username:    String(username || 'Kullanıcı').slice(0, 30),
+        address,
+        expires_at:  new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString(),
       })
       .select()
       .single()

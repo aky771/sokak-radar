@@ -49,11 +49,11 @@ export default function UserProfileModal({ userId, username: fallbackUsername, o
       return
     }
     supabase.from('profiles').select('*').eq('id', userId).maybeSingle()
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) console.error('Profil yüklenemedi:', error)
         if (data) {
           setProfile(data)
         } else {
-          // Profile row missing — build minimal display from available fallback info
           const nameHint = fallbackUsername || (isOwn ? user?.email?.split('@')[0] : null)
           setProfile(nameHint ? {
             id: userId, username: nameHint,
@@ -61,6 +61,11 @@ export default function UserProfileModal({ userId, username: fallbackUsername, o
             alert_count: 0, created_at: null,
           } : null)
         }
+        setLoading(false)
+      })
+      .catch((err) => {
+        console.error('Profil isteği başarısız:', err)
+        setProfile(null)
         setLoading(false)
       })
   }, [userId, myProfile, isOwn])
@@ -173,8 +178,13 @@ export default function UserProfileModal({ userId, username: fallbackUsername, o
                     />
                     <input
                       style={input} value={editForm.username}
-                      placeholder="Kullanıcı adı"
-                      onChange={(e) => setEditForm((f) => ({ ...f, username: e.target.value }))}
+                      placeholder="Kullanıcı adı (harf, rakam, alt çizgi)"
+                      maxLength={30}
+                      onChange={(e) => {
+                        // Sadece harf, rakam, alt çizgi — XSS / injection engeli
+                        const safe = e.target.value.replace(/[^a-zA-Z0-9_çğıöşüÇĞİÖŞÜ]/g, '').slice(0, 30)
+                        setEditForm((f) => ({ ...f, username: safe }))
+                      }}
                     />
                   </div>
                 ) : (

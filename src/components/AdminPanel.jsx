@@ -175,6 +175,7 @@ export default function AdminPanel({ onClose }) {
       .select('*')
       .eq('user_id', profile.id)
       .order('created_at', { ascending: false })
+      .limit(100)
     setUserAlerts(data || [])
     setAlertsLoading(false)
   }

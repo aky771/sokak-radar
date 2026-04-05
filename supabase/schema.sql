@@ -4,6 +4,8 @@
 -- ============================================================
 
 -- Admin kontrol fonksiyonu
+-- ÖNEMLİ: Aşağıdaki e-posta adresini kendi admin e-postanızla değiştirin.
+-- Bu fonksiyon sunucu tarafında çalışır; istemci bundle'ına dahil edilmez.
 CREATE OR REPLACE FUNCTION is_admin()
 RETURNS BOOLEAN AS $$
   SELECT email = 'ayardm62@gmail.com'

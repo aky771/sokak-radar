@@ -131,8 +131,8 @@ export default function AlertDetailModal({ alert, onClose, onUserClick }) {
 
         <div style={{ padding: isMobile ? '14px 16px' : '18px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-          {/* Fotoğraf */}
-          {alert.photo_url && (
+          {/* Fotoğraf — sadece https:// URL'leri göster (javascript: protokolü engeli) */}
+          {alert.photo_url && /^https?:\/\//i.test(alert.photo_url) && (
             <div>
               <img
                 src={alert.photo_url}
