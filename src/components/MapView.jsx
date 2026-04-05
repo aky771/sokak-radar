@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react'
-import { MapContainer, TileLayer, Marker, useMapEvents, ZoomControl } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents, ZoomControl } from 'react-leaflet'
 import L from 'leaflet'
 import useAlertStore, { ALERT_TYPES } from '../store/useAlertStore'
 
