@@ -31,6 +31,7 @@ const useAlertStore = create((set, get) => ({
       .select('*')
       .gt('expires_at', new Date().toISOString())
       .order('created_at', { ascending: false })
+      .limit(200)
     if (data) {
       const normalized = data.map((a) =>
         LEGACY_TYPES.includes(a.type) ? { ...a, type: remapLegacyType(a.type) } : a

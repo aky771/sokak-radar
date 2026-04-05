@@ -34,17 +34,20 @@ export default function AddAlertModal({ position, onClose, onAdd, userLocation, 
   const handlePhoto = (e) => {
     const file = e.target.files[0]
     if (!file) return
+    // MIME tipi doğrulama — sadece gerçek görsel dosyaları kabul et
+    if (!file.type.startsWith('image/')) { alert('Sadece görsel dosyaları yüklenebilir.'); return }
     if (file.size > 5 * 1024 * 1024) { alert('Fotoğraf 5MB\'dan büyük olamaz.'); return }
     const reader = new FileReader()
     reader.onload = (ev) => {
       const img = new Image()
       img.onload = () => {
         const canvas = document.createElement('canvas')
-        const maxW = 800, scale = Math.min(1, maxW / img.width)
+        const maxW = 1200, scale = Math.min(1, maxW / img.width)
         canvas.width = img.width * scale; canvas.height = img.height * scale
         canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
-        setPhoto(canvas.toDataURL('image/jpeg', 0.7))
+        setPhoto(canvas.toDataURL('image/jpeg', 0.82))
       }
+      img.onerror = () => alert('Görsel yüklenemedi. Farklı bir dosya deneyin.')
       img.src = ev.target.result
     }
     reader.readAsDataURL(file)

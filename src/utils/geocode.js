@@ -51,6 +51,8 @@ export async function reverseGeocode(lat, lng) {
       ? parts.join(', ')
       : data.display_name?.split(',').slice(0, 2).join(',').trim() || null
 
+    // Cache boyutunu sınırla — en eski girişi sil
+    if (cache.size >= 500) cache.delete(cache.keys().next().value)
     cache.set(key, result)
     return result
   } catch {

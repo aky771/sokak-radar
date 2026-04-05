@@ -5,6 +5,12 @@ import { supabase } from '../lib/supabase'
 const cache = {}
 const listeners = {}
 
+/** Çıkış yapılınca tüm cache ve listener'ları temizle */
+export function clearProfileCache() {
+  Object.keys(cache).forEach((k) => delete cache[k])
+  Object.keys(listeners).forEach((k) => delete listeners[k])
+}
+
 function notify(userId) {
   ;(listeners[userId] || []).forEach((fn) => fn(cache[userId]))
 }

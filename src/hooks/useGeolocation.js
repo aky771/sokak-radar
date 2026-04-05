@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 
-const GPS_ACCURACY_THRESHOLD = 500
+const GPS_ACCURACY_THRESHOLD = 1000
 
 const WATCH_OPTS = {
   enableHighAccuracy: true,

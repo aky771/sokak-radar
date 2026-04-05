@@ -80,13 +80,14 @@ function friendlyError(msg) {
 }
 
 export default function AuthModal({ onClose, onSuccess, message }) {
-  const [tab, setTab]           = useState('login')
-  const [email, setEmail]       = useState('')
-  const [password, setPassword] = useState('')
-  const [username, setUsername] = useState('')
-  const [error, setError]       = useState('')
-  const [success, setSuccess]   = useState('')
-  const [loading, setLoading]   = useState(false)
+  const [tab, setTab]             = useState('login')
+  const [email, setEmail]         = useState('')
+  const [password, setPassword]   = useState('')
+  const [username, setUsername]   = useState('')
+  const [error, setError]         = useState('')
+  const [success, setSuccess]     = useState('')
+  const [loading, setLoading]     = useState(false)
+  const [showPass, setShowPass]   = useState(false)
 
   const { signIn, signUp } = useAuthStore()
 
@@ -184,12 +185,28 @@ export default function AuthModal({ onClose, onSuccess, message }) {
             </div>
             <div>
               <div style={s.label}>ŞİFRE</div>
-              <input
-                style={s.input} type="password" placeholder="••••••••"
-                value={password} onChange={(e) => setPassword(e.target.value)}
-                onFocus={focusStyle} onBlur={blurStyle}
-                autoComplete={tab === 'login' ? 'current-password' : 'new-password'}
-              />
+              <div style={{ position: 'relative' }}>
+                <input
+                  style={{ ...s.input, paddingRight: '42px', boxSizing: 'border-box' }}
+                  type={showPass ? 'text' : 'password'}
+                  placeholder="••••••••"
+                  value={password} onChange={(e) => setPassword(e.target.value)}
+                  onFocus={focusStyle} onBlur={blurStyle}
+                  autoComplete={tab === 'login' ? 'current-password' : 'new-password'}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPass((v) => !v)}
+                  style={{
+                    position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    color: '#64748b', fontSize: 16, padding: '2px 4px', lineHeight: 1,
+                  }}
+                  title={showPass ? 'Şifreyi gizle' : 'Şifreyi göster'}
+                >
+                  {showPass ? '🙈' : '👁️'}
+                </button>
+              </div>
             </div>
 
             {error   && <div style={s.errorBox}>⚠️ {error}</div>}

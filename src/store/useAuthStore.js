@@ -1,6 +1,10 @@
 import { create } from 'zustand'
 import { supabase, ADMIN_EMAIL } from '../lib/supabase'
 import useAlertStore from './useAlertStore'
+import { clearProfileCache } from '../hooks/useProfileCache'
+
+// onAuthStateChange aboneliğini tut — bellek sızıntısını önle
+let _authSubscription = null
 
 const useAuthStore = create((set, get) => ({
   user: null,
@@ -15,12 +19,15 @@ const useAuthStore = create((set, get) => ({
     }
     set({ loading: false })
 
-    supabase.auth.onAuthStateChange(async (_event, session) => {
+    // Önceki abonelik varsa iptal et
+    if (_authSubscription) { _authSubscription.unsubscribe(); _authSubscription = null }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       const user = session?.user || null
       set({ user })
       if (user) await get().fetchProfile(user.id)
       else set({ profile: null })
     })
+    _authSubscription = subscription
   },
 
   fetchProfile: async (userId) => {
@@ -53,6 +60,7 @@ const useAuthStore = create((set, get) => ({
 
   signOut: async () => {
     await supabase.auth.signOut()
+    clearProfileCache()
     set({ user: null, profile: null })
   },
 

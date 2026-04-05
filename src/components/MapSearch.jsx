@@ -63,7 +63,7 @@ export default function MapSearch({ onSelect, isMobile }) {
       setResults(res)
       setOpen(res.length > 0)
       setLoading(false)
-    }, 500)
+    }, 750)
   }, [])
 
   const handleSelect = (r) => {

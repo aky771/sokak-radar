@@ -77,6 +77,7 @@ export default function App() {
   const [detailAlert, setDetailAlert]           = useState(null)   // AlertDetailModal
   const [profileUser, setProfileUser]            = useState(null)   // { id, username } for UserProfileModal
   const [currentZoom, setCurrentZoom]           = useState(null)
+  const [isOnline, setIsOnline]                 = useState(navigator.onLine)
 
   // Yakın uyarı bildirimi
   const [nearbyAlert, setNearbyAlert]   = useState(null)
@@ -84,8 +85,21 @@ export default function App() {
   const locationRef                     = useRef(null)
   const notifiedAlertsRef               = useRef(new Set()) // bu oturumda zaten bildirilen alert id'leri
   const nearbyTimerRef                  = useRef(null)
+  const proximityDebounceRef            = useRef(null)
 
   useEffect(() => { locationRef.current = location }, [location])
+
+  // Çevrimiçi/çevrimdışı durumu izle
+  useEffect(() => {
+    const setOnline  = () => setIsOnline(true)
+    const setOffline = () => setIsOnline(false)
+    window.addEventListener('online',  setOnline)
+    window.addEventListener('offline', setOffline)
+    return () => {
+      window.removeEventListener('online',  setOnline)
+      window.removeEventListener('offline', setOffline)
+    }
+  }, [])
 
   // Sıradaki uyarıyı göster
   const showNextInQueue = useCallback((queue) => {
@@ -100,9 +114,11 @@ export default function App() {
     }, 8000)
   }, [])
 
-  // GPS konumu değişince mevcut uyarılara yakınlık kontrolü (500 m)
+  // GPS konumu değişince mevcut uyarılara yakınlık kontrolü (500 m) — debounced 2s
   useEffect(() => {
     if (!location) return
+    clearTimeout(proximityDebounceRef.current)
+    proximityDebounceRef.current = setTimeout(() => {
     const NOTIFY_M = 500   // bildirim eşiği (metre)
     const RESET_M  = 1500  // bu kadar uzaklaşınca tekrar bildirilebilir hale gelir
 
@@ -129,6 +145,8 @@ export default function App() {
       if (!nearbyAlert) showNextInQueue(combined)
       return nearbyAlert ? combined : []
     })
+    }, 2000) // 2 saniyelik debounce — her GPS güncellemesinde hesaplama yapmaz
+    return () => clearTimeout(proximityDebounceRef.current)
   }, [location, alerts])
 
   const supabaseConfigured = !!(
@@ -318,7 +336,19 @@ VITE_SUPABASE_ANON_KEY=eyJ...`}
 
   return (
     <>
-      <div style={s.app} className="app-root">
+      {/* Çevrimdışı banner */}
+      {!isOnline && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999,
+          background: '#7f1d1d', color: '#fecaca',
+          padding: '8px 16px', textAlign: 'center',
+          fontSize: '13px', fontWeight: 600,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+        }}>
+          <span>📡</span> İnternet bağlantısı yok — uyarılar güncellenmiyor
+        </div>
+      )}
+      <div style={{ ...s.app, ...(isOnline ? {} : { paddingTop: '36px' }) }} className="app-root">
         <Header
           onLoginClick={() => setAuthModalOpen(true)}
           onAdminClick={() => setShowAdmin(true)}
