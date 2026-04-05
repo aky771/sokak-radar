@@ -3,14 +3,19 @@ import { supabase } from '../lib/supabase'
 import { reverseGeocode } from '../utils/geocode'
 
 export const ALERT_TYPES = {
-  traffic:  { label: 'Trafik',        emoji: '🚗', color: '#f59e0b', bg: '#78350f22' },
   accident: { label: 'Kaza',          emoji: '🚨', color: '#ef4444', bg: '#7f1d1d22' },
   hazard:   { label: 'Tehlike',       emoji: '⚠️', color: '#f97316', bg: '#7c2d1222' },
   police:   { label: 'Polis',         emoji: '🚔', color: '#3b82f6', bg: '#1e3a5f22' },
   roadwork: { label: 'Yol Çalışması', emoji: '🚧', color: '#a855f7', bg: '#4a1d9622' },
   closure:  { label: 'Yol Kapanışı',  emoji: '🚫', color: '#6b7280', bg: '#1f293722' },
   spotted:  { label: 'Görüldü',       emoji: '👁️', color: '#10b981', bg: '#064e3b22' },
-  flood:    { label: 'Su Baskını',    emoji: '🌊', color: '#0ea5e9', bg: '#0c4a6e22' },
+}
+
+const LEGACY_TYPES = ['traffic', 'flood']
+const FALLBACK_TYPES = Object.keys(ALERT_TYPES)
+function remapLegacyType(type) {
+  if (!LEGACY_TYPES.includes(type)) return type
+  return FALLBACK_TYPES[Math.floor(Math.random() * FALLBACK_TYPES.length)]
 }
 
 const useAlertStore = create((set, get) => ({
@@ -27,7 +32,10 @@ const useAlertStore = create((set, get) => ({
       .gt('expires_at', new Date().toISOString())
       .order('created_at', { ascending: false })
     if (data) {
-      set({ alerts: data, loading: false })
+      const normalized = data.map((a) =>
+        LEGACY_TYPES.includes(a.type) ? { ...a, type: remapLegacyType(a.type) } : a
+      )
+      set({ alerts: normalized, loading: false })
       // Kullanıcı oylarını getir
       const { data: { user } } = await supabase.auth.getUser()
       if (user && data.length > 0) {
@@ -55,7 +63,10 @@ const useAlertStore = create((set, get) => ({
     const channel = supabase
       .channel('public:alerts:v2')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'alerts' }, (payload) => {
-        set((state) => ({ alerts: [payload.new, ...state.alerts] }))
+        const incoming = LEGACY_TYPES.includes(payload.new.type)
+          ? { ...payload.new, type: remapLegacyType(payload.new.type) }
+          : payload.new
+        set((state) => ({ alerts: [incoming, ...state.alerts] }))
         if (onNewAlert) onNewAlert(payload.new)
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'alerts' }, (payload) => {
@@ -81,7 +92,7 @@ const useAlertStore = create((set, get) => ({
     }
 
     // --- İzin verilen türler ---
-    const VALID_TYPES = ['traffic','accident','hazard','police','roadwork','closure','spotted','flood']
+    const VALID_TYPES = Object.keys(ALERT_TYPES)
     if (!VALID_TYPES.includes(alertData.type)) {
       return { data: null, error: new Error('Geçersiz uyarı türü') }
     }
