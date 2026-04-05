@@ -18,10 +18,9 @@ const blurBg = (bg) => ({
 })
 
 const s = {
-  // height: 100% → index.css'teki -webkit-fill-available ile Safari'de düzgün çalışır
-  app: { display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' },
-  content: { display: 'flex', flex: 1, overflow: 'hidden', position: 'relative', minHeight: 0 },
-  mapWrapper: { flex: 1, position: 'relative', overflow: 'hidden', minWidth: 0 },
+  app: { display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' },
+  content: { display: 'flex', flex: 1, overflow: 'hidden', position: 'relative' },
+  mapWrapper: { flex: 1, position: 'relative', overflow: 'hidden' },
   fabBtn: (primary) => ({
     display: 'flex', alignItems: 'center', gap: '8px', padding: '11px 20px', borderRadius: '30px',
     border: primary ? 'none' : '1px solid #2d3148', cursor: 'pointer', whiteSpace: 'nowrap',
