@@ -55,7 +55,7 @@ const s = {
 }
 
 export default function App() {
-  const { fetchAlerts, subscribeToAlerts, addAlert } = useAlertStore()
+  const { fetchAlerts, subscribeToAlerts, addAlert, alerts } = useAlertStore()
   const { user, profile, init: initAuth, loading: authLoading, isAdmin } = useAuthStore()
   const {
     location, ipLocation, gpsLocation, manualLocation,
@@ -77,9 +77,57 @@ export default function App() {
   const [profileUser, setProfileUser]            = useState(null)   // { id, username } for UserProfileModal
 
   // Yakın uyarı bildirimi
-  const [nearbyAlert, setNearbyAlert] = useState(null)
-  const locationRef = useRef(null)
+  const [nearbyAlert, setNearbyAlert]   = useState(null)
+  const [alertQueue, setAlertQueue]     = useState([])   // birden fazla yakın uyarı sırası
+  const locationRef                     = useRef(null)
+  const notifiedAlertsRef               = useRef(new Set()) // bu oturumda zaten bildirilen alert id'leri
+  const nearbyTimerRef                  = useRef(null)
+
   useEffect(() => { locationRef.current = location }, [location])
+
+  // Sıradaki uyarıyı göster
+  const showNextInQueue = useCallback((queue) => {
+    if (queue.length === 0) return
+    const [next, ...rest] = queue
+    setNearbyAlert(next)
+    setAlertQueue(rest)
+    clearTimeout(nearbyTimerRef.current)
+    nearbyTimerRef.current = setTimeout(() => {
+      setNearbyAlert(null)
+      if (rest.length > 0) showNextInQueue(rest)
+    }, 8000)
+  }, [])
+
+  // GPS konumu değişince mevcut uyarılara yakınlık kontrolü (500 m)
+  useEffect(() => {
+    if (!location) return
+    const NOTIFY_M = 500   // bildirim eşiği (metre)
+    const RESET_M  = 1500  // bu kadar uzaklaşınca tekrar bildirilebilir hale gelir
+
+    // Uzaklaşılan uyarıları notifiedRef'den temizle
+    notifiedAlertsRef.current.forEach((id) => {
+      const a = alerts.find((x) => x.id === id)
+      if (!a) { notifiedAlertsRef.current.delete(id); return }
+      const m = distKm(location.lat, location.lng, a.lat, a.lng) * 1000
+      if (m > RESET_M) notifiedAlertsRef.current.delete(id)
+    })
+
+    // Yeni yakın uyarıları bul
+    const newNearby = alerts.filter((a) => {
+      if (notifiedAlertsRef.current.has(a.id)) return false
+      return distKm(location.lat, location.lng, a.lat, a.lng) * 1000 <= NOTIFY_M
+    })
+
+    if (newNearby.length === 0) return
+
+    newNearby.forEach((a) => notifiedAlertsRef.current.add(a.id))
+
+    setAlertQueue((prev) => {
+      const combined = [...prev, ...newNearby]
+      if (!nearbyAlert) showNextInQueue(combined)
+      return nearbyAlert ? combined : []
+    })
+  }, [location, alerts])
 
   const supabaseConfigured = !!(
     import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -90,14 +138,16 @@ export default function App() {
     setTimeout(() => setToast((t) => ({ ...t, visible: false })), duration)
   }, [])
 
-  // Yakın uyarı gelince bildirim göster
+  // Yeni uyarı gelince bildirim göster (realtime)
   const handleNewAlert = useCallback((alert) => {
     const loc = locationRef.current
     if (!loc) return
     const km = distKm(loc.lat, loc.lng, alert.lat, alert.lng)
     if (km <= 1) {
+      notifiedAlertsRef.current.add(alert.id)
       setNearbyAlert(alert)
-      setTimeout(() => setNearbyAlert(null), 8000)
+      clearTimeout(nearbyTimerRef.current)
+      nearbyTimerRef.current = setTimeout(() => setNearbyAlert(null), 8000)
     }
   }, [])
 
@@ -107,7 +157,7 @@ export default function App() {
     fetchAlerts()
     const unsub = subscribeToAlerts(handleNewAlert)
     const interval = setInterval(fetchAlerts, 5 * 60 * 1000)
-    return () => { unsub(); clearInterval(interval) }
+    return () => { unsub(); clearInterval(interval); clearTimeout(nearbyTimerRef.current) }
   }, [supabaseConfigured])
 
   const [hasFlownToGps, setHasFlownToGps] = useState(false)
@@ -312,7 +362,7 @@ VITE_SUPABASE_ANON_KEY=eyJ...`}
             {nearbyAlert && (
               <div style={{
                 position: 'absolute', top: '52px', left: '50%', transform: 'translateX(-50%)',
-                zIndex: 850, maxWidth: '92%',
+                zIndex: 850, maxWidth: '92%', minWidth: '260px',
                 ...blurBg('#1e3a5fee'),
                 border: '1px solid #3b82f666', borderRadius: '14px', padding: '10px 14px',
                 display: 'flex', alignItems: 'center', gap: '10px',
@@ -324,14 +374,19 @@ VITE_SUPABASE_ANON_KEY=eyJ...`}
                 </span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: '#93c5fd' }}>
-                    📍 Yakınınızda yeni uyarı!
+                    📍 Yakınınızda uyarı var!
                   </div>
                   <div style={{ fontSize: 11, color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {nearbyAlert.address || nearbyAlert.description || 'Uyarıyı görüntüle'}
+                    {(ALERT_TYPES[nearbyAlert.type] || {}).label} — {nearbyAlert.address || nearbyAlert.description || 'Detay için tıklayın'}
                   </div>
+                  {alertQueue.length > 0 && (
+                    <div style={{ fontSize: 10, color: '#475569', marginTop: 2 }}>
+                      +{alertQueue.length} uyarı daha var
+                    </div>
+                  )}
                 </div>
                 <button
-                  onClick={() => { setDetailAlert(nearbyAlert); setNearbyAlert(null) }}
+                  onClick={() => { setDetailAlert(nearbyAlert); setNearbyAlert(null); showNextInQueue(alertQueue) }}
                   style={{
                     background: '#3b82f6', border: 'none', color: 'white',
                     padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer',
@@ -341,7 +396,7 @@ VITE_SUPABASE_ANON_KEY=eyJ...`}
                   Gör
                 </button>
                 <button
-                  onClick={() => setNearbyAlert(null)}
+                  onClick={() => { setNearbyAlert(null); showNextInQueue(alertQueue) }}
                   style={{ background: 'none', border: 'none', color: '#64748b', fontSize: 16, cursor: 'pointer', padding: '2px 4px' }}
                 >
                   ×
