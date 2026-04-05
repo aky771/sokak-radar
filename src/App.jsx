@@ -8,6 +8,7 @@ import AdminPanel from './components/AdminPanel'
 import AlertDetailModal from './components/AlertDetailModal'
 import UserProfileModal from './components/UserProfileModal'
 import useAlertStore, { ALERT_TYPES } from './store/useAlertStore'
+import MapSearch from './components/MapSearch'
 import useAuthStore from './store/useAuthStore'
 import useGeolocation from './hooks/useGeolocation'
 import useIsMobile from './hooks/useIsMobile'
@@ -75,6 +76,7 @@ export default function App() {
   const [manualPickMode, setManualPickMode]     = useState(false)
   const [detailAlert, setDetailAlert]           = useState(null)   // AlertDetailModal
   const [profileUser, setProfileUser]            = useState(null)   // { id, username } for UserProfileModal
+  const [currentZoom, setCurrentZoom]           = useState(null)
 
   // Yakın uyarı bildirimi
   const [nearbyAlert, setNearbyAlert]   = useState(null)
@@ -336,6 +338,11 @@ VITE_SUPABASE_ANON_KEY=eyJ...`}
               isMobile={isMobile}
               onAlertDetail={handleDetailClick}
               sidebarOpen={sidebarOpen}
+              onZoomChange={setCurrentZoom}
+            />
+            <MapSearch
+              isMobile={isMobile}
+              onSelect={(place) => setFlyTarget({ lat: place.lat, lng: place.lng })}
             />
 
             {/* Üst bilgi */}
@@ -539,6 +546,7 @@ VITE_SUPABASE_ANON_KEY=eyJ...`}
         <AddAlertModal
           position={clickedPos}
           userLocation={location}
+          currentZoom={currentZoom}
           onClose={() => { setModalOpen(false); setClickedPos(null) }}
           onAdd={handleAddAlert}
         />

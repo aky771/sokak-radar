@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react'
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents, ZoomControl, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import useAlertStore, { ALERT_TYPES } from '../store/useAlertStore'
 
@@ -41,10 +41,12 @@ const manualIcon = L.divIcon({
 })
 
 
-function MapClickHandler({ onMapClick, onRightClick }) {
+function MapClickHandler({ onMapClick, onRightClick, onZoomChange }) {
   useMapEvents({
     click:       (e) => onMapClick({ lat: e.latlng.lat, lng: e.latlng.lng }),
     contextmenu: (e) => onRightClick && onRightClick({ lat: e.latlng.lat, lng: e.latlng.lng }),
+    zoomend:     (e) => onZoomChange && onZoomChange(e.target.getZoom()),
+    load:        (e) => onZoomChange && onZoomChange(e.target.getZoom()),
   })
   return null
 }
@@ -78,7 +80,7 @@ function MapResizeHandler({ sidebarOpen }) {
 export default function MapView({
   onMapClick, onRightClick, flyTarget,
   gpsLocation, manualLocation, setManualLocation, initialCenter, isMobile,
-  onAlertDetail, sidebarOpen,
+  onAlertDetail, sidebarOpen, onZoomChange,
 }) {
   const alerts = useAlertStore((st) => st.alerts)
 
@@ -102,8 +104,8 @@ export default function MapView({
         updateWhenIdle={false}
         updateWhenZooming={false}
       />
-      <ZoomControl position={isMobile ? 'topright' : 'bottomright'} />
-      <MapClickHandler onMapClick={onMapClick} onRightClick={onRightClick} />
+      {/* ZoomControl kaldırıldı — +/- çubuğu yerine pinch/scroll yeterli */}
+      <MapClickHandler onMapClick={onMapClick} onRightClick={onRightClick} onZoomChange={onZoomChange} />
       <MapResizeHandler sidebarOpen={sidebarOpen} />
       {flyTarget && <MapFlyTo target={flyTarget} />}
 
