@@ -113,8 +113,9 @@ export default function AdminPanel({ onClose }) {
     const now = new Date().toISOString()
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
 
-    const [profilesRes, activeAlertsRes, totalAlertsRes, recentAlertsRes] = await Promise.all([
-      supabase.from('profiles').select('*').order('created_at', { ascending: false }),
+    const [usersRes, activeAlertsRes, totalAlertsRes, recentAlertsRes] = await Promise.all([
+      // admin_get_all_users: auth.users + profiles JOIN → tüm kayıtlı kullanıcılar görünür
+      supabase.rpc('admin_get_all_users'),
       supabase.from('alerts').select('id', { count: 'exact' }).gt('expires_at', now),
       supabase.from('alerts').select('id', { count: 'exact' }),
       supabase.from('alerts')
@@ -123,7 +124,7 @@ export default function AdminPanel({ onClose }) {
         .order('created_at', { ascending: false }),
     ])
 
-    const all = profilesRes.data || []
+    const all = usersRes.data || []
     setProfiles(all)
     setStats({
       users: all.length,
@@ -320,7 +321,14 @@ export default function AdminPanel({ onClose }) {
                       </div>
                     </td>
                     <td style={s.td}>{p.email}</td>
-                    <td style={s.td}>{timeAgo(p.created_at)}</td>
+                    <td style={s.td}>
+                      <div>{timeAgo(p.created_at)}</div>
+                      {p.last_sign_in && (
+                        <div style={{ fontSize: 11, color: '#475569', marginTop: 2 }}>
+                          Son giriş: {timeAgo(p.last_sign_in)}
+                        </div>
+                      )}
+                    </td>
                     <td style={s.td}>
                       <span style={{ color: '#6366f1', fontWeight: 700 }}>{p.alert_count}</span>
                     </td>
